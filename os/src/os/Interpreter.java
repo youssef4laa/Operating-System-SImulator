@@ -55,11 +55,20 @@ public class Interpreter {
             // Log execution
             System.out.println("Process " + pcb.processID + " executing: " + instruction);
             
+            // Track status before execution
+            String statusBefore = pcb.status;
+            
             // Execute instruction
             executeInstruction(instruction, pcb, memory);
             
-            // Update program counter (each instruction increments it)
-            pcb.programCounter++;
+            // CRITICAL FIX: Only increment program counter if instruction didn't block
+            // If instruction caused a block (e.g., waiting for user input), 
+            // don't increment so when process resumes, it retries this same instruction
+            if (!pcb.status.equals("Blocked")) {
+                pcb.programCounter++;
+            } else {
+                System.out.println("Process " + pcb.processID + " blocked on instruction: " + instruction);
+            }
             
         } catch (Exception e) {
             System.err.println("Execution error in Process " + pcb.processID + ": " + e.getMessage());

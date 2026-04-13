@@ -50,9 +50,12 @@ public class Scheduler {
             // Check for new process arrivals
             checkArrivals(time, memory);
             
-            if (readyQueue.isEmpty() && blockedQueue.isEmpty() && 
-                !q0.isEmpty() == false && !q1.isEmpty() == false && 
-                !q2.isEmpty() == false && !q3.isEmpty() == false) {
+            // Check termination: all queues empty
+            boolean readyEmpty = readyQueue.isEmpty();
+            boolean blockedEmpty = blockedQueue.isEmpty();
+            boolean allMLFQEmpty = q0.isEmpty() && q1.isEmpty() && q2.isEmpty() && q3.isEmpty();
+            
+            if (readyEmpty && blockedEmpty && allMLFQEmpty) {
                 // No more processes to run
                 System.out.println("\n========================================");
                 System.out.println("All processes completed");
