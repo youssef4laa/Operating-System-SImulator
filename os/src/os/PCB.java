@@ -47,18 +47,28 @@ public class PCB {
 	        if (instructionPointer < instructionList.size()) {
 	            return instructionList.get(instructionPointer++);
 	        }
-	        return null;
-	    }
-	    
-	    public void resetInstructionPointer() {
-	        this.instructionPointer = 0;
-	    }
-	    
-	    /**
-	     * Safely adds a variable to the symbol table with validation
-	     * @return true if variable was added, false if limit exceeded
-	     */
-	    public boolean addVariable(String varName, int memoryAddress) throws Exception {
+        return null;
+    }
+    
+    /**
+     * Go back to the previous instruction (for retry after blocking)
+     * Called when a process is blocked and needs to retry the same instruction
+     */
+    public void retryInstruction() {
+        if (instructionPointer > 0) {
+            instructionPointer--;
+        }
+    }
+    
+    public void resetInstructionPointer() {
+        this.instructionPointer = 0;
+    }
+    
+    /**
+     * Safely adds a variable to the symbol table with validation
+     * @return true if variable was added, false if limit exceeded
+     */
+    public boolean addVariable(String varName, int memoryAddress) throws Exception {
 	        if (variableCount >= MAX_VARIABLES_PER_PROCESS) {
 	            throw new Exception("Variable limit exceeded for Process " + processID + 
 	                               ": max " + MAX_VARIABLES_PER_PROCESS + " variables allowed");

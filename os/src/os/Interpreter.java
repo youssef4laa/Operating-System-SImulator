@@ -61,13 +61,15 @@ public class Interpreter {
             // Execute instruction
             executeInstruction(instruction, pcb, memory);
             
-            // CRITICAL FIX: Only increment program counter if instruction didn't block
-            // If instruction caused a block (e.g., waiting for user input), 
-            // don't increment so when process resumes, it retries this same instruction
-            if (!pcb.status.equals("Blocked")) {
-                pcb.programCounter++;
-            } else {
+            // CRITICAL: Handle blocking scenarios
+            if (pcb.status.equals("Blocked")) {
+                // Process was blocked (e.g., waiting for mutex)
+                // Decrement instruction pointer to retry this instruction
+                pcb.retryInstruction();
                 System.out.println("Process " + pcb.processID + " blocked on instruction: " + instruction);
+            } else {
+                // Instruction completed successfully, advance program counter
+                pcb.programCounter++;
             }
             
         } catch (Exception e) {

@@ -18,10 +18,13 @@ public class Scheduler {
     LinkedList<PCB> q2 = new LinkedList<>();
     LinkedList<PCB> q3 = new LinkedList<>();
 
-    // Resource mutexes
-    Mutex mutexUserOutput = new Mutex();
-    Mutex mutexUserInput = new Mutex();
-    Mutex mutexFile = new Mutex();
+    // Resource mutexes managed by MutexManager
+    private MutexManager mutexManager;
+    
+    // Legacy references for backward compatibility
+    Mutex mutexUserOutput;
+    Mutex mutexUserInput;
+    Mutex mutexFile;
     
     int time = 0;
     String algorithm = "RR"; // Default: Round Robin
@@ -36,11 +39,18 @@ public class Scheduler {
     public void start(Memory mem) throws Exception {
         this.memory = mem;
         
+        // Initialize mutex manager
+        this.mutexManager = new MutexManager();
+        this.mutexUserOutput = mutexManager.getUserOutputMutex();
+        this.mutexUserInput = mutexManager.getUserInputMutex();
+        this.mutexFile = mutexManager.getFileMutex();
+        
         // Initialize interpreter with scheduler and mutexes
         Interpreter.initialize(this, mutexUserOutput, mutexUserInput, mutexFile);
         
         System.out.println("========================================");
         System.out.println("Scheduler started with " + algorithm + " algorithm");
+        System.out.println("Mutex Manager initialized");
         System.out.println("========================================\n");
 
         int maxIterations = 1000; // Prevent infinite loops for debugging
@@ -59,6 +69,7 @@ public class Scheduler {
                 // No more processes to run
                 System.out.println("\n========================================");
                 System.out.println("All processes completed");
+                mutexManager.printStatistics();
                 System.out.println("========================================\n");
                 break;
             }
@@ -296,6 +307,12 @@ public class Scheduler {
                 System.out.println(">>> Process 3 arrived at time " + time);
             }
         }
+    }
+    /**
+     * Get the Mutex Manager instance
+     */
+    public MutexManager getMutexManager() {
+        return mutexManager;
     }
     
     /**
