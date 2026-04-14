@@ -14,8 +14,8 @@ echo "Compiling Java files..."
 # Create bin directory if it doesn't exist
 mkdir -p bin
 
-# Compile (no JavaFX modules needed - Swing is part of standard Java)
-javac -d bin src/os/*.java 2>&1 | tee build.log
+# Compile with Java 21 support
+javac -source 21 -target 21 -d bin src/os/*.java 2>&1 | tee build.log
 
 if [ $? -eq 0 ]; then
     echo ""

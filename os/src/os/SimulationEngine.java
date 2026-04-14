@@ -1,6 +1,9 @@
 package os;
 
+import java.io.File;
 import java.util.LinkedList;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * SimulationEngine - Manages the OS simulation execution
@@ -24,27 +27,75 @@ public class SimulationEngine {
     private String currentInstruction = "";
     private SimulationListener listener;
     
-    // Program files
-    private static final String[] PROGRAM_FILES = {
-        "Program1.txt",
-        "Program2.txt", 
-        "Program3.txt"
-    };
-    
-    // Process arrival times
-    private static final int[] ARRIVAL_TIMES = { 0, 1, 4 };
-    private LinkedList<Integer> processesToCreate;
+    // Dynamic program loading
+    private List<FileProgram> fileProgramQueue = new ArrayList<>();
     private int nextArrivalIndex = 0;
+    
+    /**
+     * Inner class to hold file + arrival time pair
+     */
+    private static class FileProgram {
+        File file;
+        int arrivalTime;
+        
+        FileProgram(File file, int arrivalTime) {
+            this.file = file;
+            this.arrivalTime = arrivalTime;
+        }
+    }
     
     public SimulationEngine(DebugConsole debugConsole) {
         this.memory = new Memory();
         this.scheduler = new Scheduler();
         this.debugConsole = debugConsole;
-        this.processesToCreate = new LinkedList<>();
-        
-        for (int i = 0; i < ARRIVAL_TIMES.length; i++) {
-            processesToCreate.add(i);
+        this.fileProgramQueue = new ArrayList<>();
+    }
+    
+    /**
+     * Load programs from files for execution
+     * Assigns sequential arrival times and validates file format
+     */
+    public void loadProgramsFromFiles(List<File> files, List<Integer> arrivalTimes) throws Exception {
+        if (files == null || files.isEmpty()) {
+            throw new Exception("No program files provided");
         }
+        
+        if (files.size() != arrivalTimes.size()) {
+            throw new Exception("Mismatch between file count and arrival times");
+        }
+        
+        fileProgramQueue.clear();
+        nextArrivalIndex = 0;
+        
+        // Validate all files before adding to queue
+        for (int i = 0; i < files.size(); i++) {
+            File file = files.get(i);
+            int arrivalTime = arrivalTimes.get(i);
+            
+            if (!file.exists()) {
+                throw new Exception("File not found: " + file.getAbsolutePath());
+            }
+            
+            if (!file.isFile()) {
+                throw new Exception("Not a file: " + file.getAbsolutePath());
+            }
+            
+            if (!file.canRead()) {
+                throw new Exception("Cannot read file: " + file.getAbsolutePath());
+            }
+            
+            fileProgramQueue.add(new FileProgram(file, arrivalTime));
+        }
+        
+        // Log program queue
+        debugConsole.log("======================================");
+        debugConsole.log("Programs loaded: " + fileProgramQueue.size());
+        for (int i = 0; i < fileProgramQueue.size(); i++) {
+            FileProgram fp = fileProgramQueue.get(i);
+            debugConsole.log("  Program " + (i + 1) + ": " + fp.file.getName() + 
+                           " (arrival time: " + fp.arrivalTime + ")");
+        }
+        debugConsole.log("======================================");
     }
     
     /**
@@ -63,7 +114,7 @@ public class SimulationEngine {
             debugConsole.log("Simulation Initialized");
             debugConsole.log("Algorithm: " + algorithm);
             debugConsole.log("Memory Size: 40 words");
-            debugConsole.log("Process Count: 3");
+            debugConsole.log("Process Count: " + fileProgramQueue.size());
             debugConsole.log("======================================");
             
             if (listener != null) listener.onInitialized();
@@ -90,6 +141,10 @@ public class SimulationEngine {
      */
     public void step() {
         if (!initialized) {
+            if (fileProgramQueue.isEmpty()) {
+                debugConsole.log("No programs loaded. Please drag and drop program files first.", true);
+                return;
+            }
             initialize("RR");
         }
         
@@ -99,10 +154,10 @@ public class SimulationEngine {
         
         try {
             // Check for new process arrivals
-            if (nextArrivalIndex < ARRIVAL_TIMES.length) {
-                if (ARRIVAL_TIMES[nextArrivalIndex] == clockCycle) {
-                    int processNum = PROGRAM_FILES.length - ARRIVAL_TIMES.length + nextArrivalIndex;
-                    createProcess(nextArrivalIndex, PROGRAM_FILES[nextArrivalIndex]);
+            if (nextArrivalIndex < fileProgramQueue.size()) {
+                FileProgram nextProgram = fileProgramQueue.get(nextArrivalIndex);
+                if (nextProgram.arrivalTime == clockCycle) {
+                    createProcess(nextArrivalIndex, nextProgram.file);
                     nextArrivalIndex++;
                 }
             }
@@ -175,20 +230,22 @@ public class SimulationEngine {
     }
     
     /**
-     * Create a new process
+     * Create a new process from file
      */
-    private void createProcess(int processIdx, String filename) {
+    private void createProcess(int processIdx, File file) {
         try {
-            debugConsole.log("[Clock " + clockCycle + "] Creating Process " + (processIdx + 1) + " from " + filename);
+            debugConsole.log("[Clock " + clockCycle + "] Creating Process " + (processIdx + 1) + 
+                           " from " + file.getName());
             
-            // TODO: Implement file parsing - for now, use manual process creation
-            // Parser.parseFile is not available, so we'll need to load programs differently
-            // in the actual implementation
+            // Use Process.createProcess to load and parse the program file
+            PCB pcb = Process.createProcess(file.getAbsolutePath(), memory);
+            scheduler.readyQueue.add(pcb);
             
-            debugConsole.log("  -> Process creation requires program loading implementation");
+            debugConsole.log("  -> Process P" + pcb.processID + " created successfully");
             
         } catch (Exception e) {
             debugConsole.log("Failed to create process: " + e.getMessage(), true);
+            e.printStackTrace();
         }
     }
     
@@ -225,6 +282,7 @@ public class SimulationEngine {
         initialized = false;
         currentProcess = null;
         currentInstruction = "";
+        // Note: Do NOT clear fileProgramQueue - user can reload same programs
         
         debugConsole.clear();
         debugConsole.log("Simulation reset");
@@ -268,6 +326,20 @@ public class SimulationEngine {
     
     public void setListener(SimulationListener listener) {
         this.listener = listener;
+    }
+    
+    /**
+     * Check if programs are loaded
+     */
+    public boolean hasProgramsLoaded() {
+        return !fileProgramQueue.isEmpty();
+    }
+    
+    /**
+     * Get the number of loaded programs
+     */
+    public int getProgramCount() {
+        return fileProgramQueue.size();
     }
     
     // ============= Listener Interface =============

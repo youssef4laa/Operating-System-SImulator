@@ -7,6 +7,8 @@ import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
+import java.io.File;
+import java.util.List;
 import java.util.Timer;
 import java.util.TimerTask;
 
@@ -30,6 +32,7 @@ public class OSSimulatorGUI extends JFrame {
     private SystemCallStatsPanel statsPanel;
     private TimelinePanel timelinePanel;
     private DebugConsole debugConsole;
+    private ProgramDropZone dropZone;
     
     // Control elements
     private JComboBox<String> algorithmSelector;
@@ -195,6 +198,12 @@ public class OSSimulatorGUI extends JFrame {
         algorithmBox.add(speedValue);
         
         header.add(algorithmBox);
+        header.add(Box.createVerticalStrut(10));
+        
+        // Drop zone for program files
+        dropZone = new ProgramDropZone();
+        dropZone.setOnProgramsDropped((files, arrivalTimes) -> onProgramsDropped(files, arrivalTimes));
+        header.add(dropZone);
         header.add(Box.createVerticalStrut(10));
         
         return header;
@@ -401,9 +410,57 @@ public class OSSimulatorGUI extends JFrame {
     }
     
     /**
+     * Handle dropped program files
+     */
+    private void onProgramsDropped(List<File> files, List<Integer> arrivalTimes) {
+        try {
+            // Reset simulation before loading new programs
+            pauseExecution();
+            engine.reset();
+            dropZone.clearPrograms();
+            
+            // Load programs into the engine
+            engine.loadProgramsFromFiles(files, arrivalTimes);
+            
+            debugConsole.log("✓ Programs loaded successfully (" + files.size() + " file(s))");
+            updateStatusLabel("Programs Loaded");
+            
+            // Show success message
+            JOptionPane.showMessageDialog(
+                this,
+                "Programs loaded successfully!\n\nFile(s): " + files.size() + 
+                "\nClick 'Initialize' to start the simulation.",
+                "Programs Loaded",
+                JOptionPane.INFORMATION_MESSAGE
+            );
+            
+        } catch (Exception e) {
+            debugConsole.log("✗ Error loading programs: " + e.getMessage(), true);
+            JOptionPane.showMessageDialog(
+                this,
+                "Error loading programs:\n\n" + e.getMessage(),
+                "Load Error",
+                JOptionPane.ERROR_MESSAGE
+            );
+            updateStatusLabel("Error");
+        }
+    }
+    
+    /**
      * Initialize simulation
      */
     private void initializeSimulation() {
+        // Check if programs are loaded
+        if (!engine.hasProgramsLoaded()) {
+            JOptionPane.showMessageDialog(
+                this,
+                "No programs loaded.\n\nPlease drag and drop program files (.txt) into the drop zone at the top.",
+                "No Programs Loaded",
+                JOptionPane.WARNING_MESSAGE
+            );
+            return;
+        }
+        
         String algorithm = (String) algorithmSelector.getSelectedItem();
         engine.initialize(algorithm);
         debugConsole.log("Simulation initialized with " + algorithm + " algorithm");
