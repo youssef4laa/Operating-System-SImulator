@@ -1,0 +1,44 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Build OS Project",
+      "type": "shell",
+      "command": "javac",
+      "args": ["-d", "bin", "src/os/*.java"],
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "problemMatcher": ["$javac"],
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "Run OS Project",
+      "type": "shell",
+      "command": "java",
+      "args": ["-cp", "bin", "os.Main"],
+      "dependsOn": ["Build OS Project"],
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": true,
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "Clean Build",
+      "type": "shell",
+      "command": "rm",
+      "args": ["-rf", "bin/"] ,
+      "presentation": {
+        "reveal": "silent"
+      }
+    }
+  ]
+}
