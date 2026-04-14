@@ -1,88 +1,99 @@
 package os;
 
-import javafx.geometry.Insets;
-import javafx.scene.layout.*;
-import javafx.scene.control.Label;
-import javafx.scene.control.TextArea;
-import javafx.scene.control.Separator;
+import javax.swing.*;
+import java.awt.*;
 
 /**
  * CurrentProcessPanel - Displays information about currently executing process
  */
-public class CurrentProcessPanel extends VBox {
+public class CurrentProcessPanel extends JPanel {
     
-    private Label processIDLabel;
-    private Label statusLabel;
-    private Label instructionLabel;
-    private Label pcLabel;
-    private Label memoryBoundsLabel;
-    private Label arrivalTimeLabel;
-    private Label remainingTimeLabel;
-    private TextArea instructionDetailsArea;
+    private JLabel processIDLabel;
+    private JLabel statusLabel;
+    private JLabel instructionLabel;
+    private JLabel pcLabel;
+    private JLabel memoryBoundsLabel;
+    private JLabel arrivalTimeLabel;
+    private JLabel remainingTimeLabel;
+    private JTextArea instructionDetailsArea;
     
     public CurrentProcessPanel() {
-        super(8);
-        this.setPadding(new Insets(15));
-        this.setStyle("-fx-border-color: #dddddd; -fx-border-radius: 3; -fx-background-color: #fafafa;");
+        this.setLayout(new BorderLayout(0, 8));
+        this.setBackground(new Color(250, 250, 250));
+        this.setBorder(BorderFactory.createLineBorder(new Color(221, 221, 221), 1));
         
         initializeComponents();
     }
     
     private void initializeComponents() {
+        JPanel innerPanel = new JPanel();
+        innerPanel.setLayout(new BoxLayout(innerPanel, BoxLayout.Y_AXIS));
+        innerPanel.setOpaque(false);
+        
         // Process ID
-        processIDLabel = new Label("Process ID: None");
-        processIDLabel.setStyle("-fx-font-size: 14px; -fx-font-weight: bold; -fx-text-fill: #0066cc;");
+        processIDLabel = new JLabel("Process ID: None");
+        processIDLabel.setFont(new Font("Arial", Font.BOLD, 14));
+        processIDLabel.setForeground(new Color(0, 102, 204));
         
         // Status
-        statusLabel = new Label("Status: Idle");
-        statusLabel.setStyle("-fx-font-size: 12px;");
+        statusLabel = new JLabel("Status: Idle");
+        statusLabel.setFont(new Font("Arial", Font.PLAIN, 12));
         
         // Current Instruction
-        instructionLabel = new Label("Current Instruction: --");
-        instructionLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: bold;");
+        instructionLabel = new JLabel("Current Instruction: --");
+        instructionLabel.setFont(new Font("Arial", Font.BOLD, 11));
         
         // Program Counter
-        pcLabel = new Label("Program Counter: --");
-        pcLabel.setStyle("-fx-font-size: 11px;");
+        pcLabel = new JLabel("Program Counter: --");
+        pcLabel.setFont(new Font("Arial", Font.PLAIN, 11));
         
         // Memory Bounds
-        memoryBoundsLabel = new Label("Memory Bounds: --");
-        memoryBoundsLabel.setStyle("-fx-font-size: 11px;");
+        memoryBoundsLabel = new JLabel("Memory Bounds: --");
+        memoryBoundsLabel.setFont(new Font("Arial", Font.PLAIN, 11));
         
         // Arrival Time
-        arrivalTimeLabel = new Label("Arrival Time: --");
-        arrivalTimeLabel.setStyle("-fx-font-size: 11px;");
+        arrivalTimeLabel = new JLabel("Arrival Time: --");
+        arrivalTimeLabel.setFont(new Font("Arial", Font.PLAIN, 11));
         
         // Remaining Time
-        remainingTimeLabel = new Label("Remaining Time: --");
-        remainingTimeLabel.setStyle("-fx-font-size: 11px;");
+        remainingTimeLabel = new JLabel("Remaining Time: --");
+        remainingTimeLabel.setFont(new Font("Arial", Font.PLAIN, 11));
         
         // Instruction Details
-        Label detailsTitle = new Label("Instruction Details:");
-        detailsTitle.setStyle("-fx-font-size: 11px; -fx-font-weight: bold;");
+        JLabel detailsTitle = new JLabel("Instruction Details:");
+        detailsTitle.setFont(new Font("Arial", Font.BOLD, 11));
         
-        instructionDetailsArea = new TextArea();
-        instructionDetailsArea.setPrefHeight(150);
+        instructionDetailsArea = new JTextArea();
         instructionDetailsArea.setEditable(false);
-        instructionDetailsArea.setWrapText(true);
-        instructionDetailsArea.setStyle("-fx-font-size: 10px; -fx-control-inner-background: #ffffff;");
+        instructionDetailsArea.setLineWrap(true);
+        instructionDetailsArea.setWrapStyleWord(true);
+        instructionDetailsArea.setFont(new Font("Courier New", Font.PLAIN, 10));
+        instructionDetailsArea.setBackground(Color.WHITE);
         instructionDetailsArea.setText("No process executing...");
+        JScrollPane scrollPane = new JScrollPane(instructionDetailsArea);
+        scrollPane.setPreferredSize(new Dimension(0, 150));
         
-        this.getChildren().addAll(
-            processIDLabel,
-            statusLabel,
-            new Separator(),
-            instructionLabel,
-            pcLabel,
-            memoryBoundsLabel,
-            arrivalTimeLabel,
-            remainingTimeLabel,
-            new Separator(),
-            detailsTitle,
-            instructionDetailsArea
-        );
+        innerPanel.add(processIDLabel);
+        innerPanel.add(Box.createVerticalStrut(3));
+        innerPanel.add(statusLabel);
+        innerPanel.add(Box.createVerticalStrut(5));
+        innerPanel.add(new JSeparator());
+        innerPanel.add(Box.createVerticalStrut(3));
+        innerPanel.add(instructionLabel);
+        innerPanel.add(pcLabel);
+        innerPanel.add(memoryBoundsLabel);
+        innerPanel.add(arrivalTimeLabel);
+        innerPanel.add(remainingTimeLabel);
+        innerPanel.add(Box.createVerticalStrut(5));
+        innerPanel.add(new JSeparator());
+        innerPanel.add(Box.createVerticalStrut(3));
+        innerPanel.add(detailsTitle);
+        innerPanel.add(Box.createVerticalStrut(3));
+        innerPanel.add(scrollPane);
         
-        VBox.setVgrow(instructionDetailsArea, Priority.ALWAYS);
+        JScrollPane mainScroll = new JScrollPane(innerPanel);
+        mainScroll.getVerticalScrollBar().setUnitIncrement(10);
+        this.add(mainScroll, BorderLayout.CENTER);
     }
     
     /**

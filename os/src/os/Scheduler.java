@@ -393,5 +393,69 @@ public class Scheduler {
         sb.append("]");
         return sb.toString();
     }
+    
+    /**
+     * Select next process based on current algorithm for GUI-based step execution
+     * Used by SimulationEngine for single-step mode
+     */
+    public PCB selectNextProcess() {
+        if (readyQueue.isEmpty()) {
+            return null;
+        }
+        
+        PCB selected = null;
+        
+        switch (algorithm.toUpperCase()) {
+            case "RR":
+                selected = readyQueue.peek(); // Peek without removing
+                break;
+                
+            case "HRRN":
+                selected = selectHRRN();
+                break;
+                
+            case "MLFQ":
+                selected = selectMLFQ();
+                break;
+                
+            default:
+                selected = readyQueue.peek();
+        }
+        
+        return selected;
+    }
+    
+    /**
+     * Select best process using HRRN without removing
+     */
+    private PCB selectHRRN() {
+        PCB best = null;
+        double maxRatio = -1;
+        
+        for (PCB p : readyQueue) {
+            int waiting = time - p.arrivalTime;
+            int burst = p.remainingTime;
+            
+            double ratio = (waiting + burst) / (double) burst;
+            
+            if (ratio > maxRatio) {
+                maxRatio = ratio;
+                best = p;
+            }
+        }
+        
+        return best;
+    }
+    
+    /**
+     * Select best process using MLFQ without removing
+     */
+    private PCB selectMLFQ() {
+        if (!q0.isEmpty()) return q0.peek();
+        if (!q1.isEmpty()) return q1.peek();
+        if (!q2.isEmpty()) return q2.peek();
+        if (!q3.isEmpty()) return q3.peek();
+        return null;
+    }
 }
 

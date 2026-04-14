@@ -2,17 +2,36 @@ package os;
 
 /**
  * Main entry point for the Operating System simulator
- * Initializes memory, scheduler, and mutexes, then starts the simulation
+ * Launches the Swing GUI for OS simulation
+ * 
+ * Also supports command-line mode with -cli flag
  */
 public class Main {
     
     public static void main(String[] args) throws Exception {
         System.out.println("\n╔════════════════════════════════════════════════════════╗");
-        System.out.println("║   Operating System Simulator - Version 1.0               ║");
+        System.out.println("║   Operating System Simulator - Version 2.0               ║");
         System.out.println("║   CSEN 602 - Spring 2026                                 ║");
+        System.out.println("║   With GUI and Real-time Visualization                   ║");
         System.out.println("╚════════════════════════════════════════════════════════╝\n");
         
+        // Check for command-line mode flag
+        if (args.length > 0 && args[0].equals("-cli")) {
+            runCLIMode();
+        } else {
+            // Launch Swing GUI
+            System.out.println("[Main] Launching GUI interface...\n");
+            OSSimulatorGUI.main(args);
+        }
+    }
+    
+    /**
+     * Run in command-line mode (no GUI)
+     */
+    private static void runCLIMode() {
         try {
+            System.out.println("[Main] Running in CLI mode (no GUI)\n");
+            
             // Initialize main memory (40 words)
             Memory memory = new Memory();
             System.out.println("[Main] Initializing memory: 40 words");

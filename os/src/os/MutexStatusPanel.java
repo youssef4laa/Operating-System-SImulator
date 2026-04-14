@@ -1,68 +1,68 @@
 package os;
 
-import javafx.geometry.Insets;
-import javafx.scene.layout.*;
-import javafx.scene.control.Label;
-import javafx.scene.paint.Color;
+import javax.swing.*;
+import java.awt.*;
 
 /**
  * MutexStatusPanel - Displays status of 3 system mutexes
  * Shows: locked/free, owner, wait queue size
  */
-public class MutexStatusPanel extends VBox {
+public class MutexStatusPanel extends JPanel {
     
-    private VBox mutexContainer;
+    private JPanel mutexContainer;
     
     public MutexStatusPanel() {
-        super(10);
-        this.setPadding(new Insets(10));
-        this.setStyle("-fx-border-color: #dddddd; -fx-border-radius: 3; -fx-background-color: #fafafa;");
+        this.setLayout(new BorderLayout(10, 10));
+        this.setBorder(BorderFactory.createLineBorder(new Color(221, 221, 221), 1));
+        this.setBackground(new Color(250, 250, 250));
         
-        mutexContainer = new VBox(8);
+        mutexContainer = new JPanel();
+        mutexContainer.setLayout(new BoxLayout(mutexContainer, BoxLayout.Y_AXIS));
+        mutexContainer.setOpaque(false);
         
         // Add three mutex status displays
-        mutexContainer.getChildren().addAll(
-            createMutexDisplay("File Access"),
-            createMutexDisplay("User Input"),
-            createMutexDisplay("User Output")
-        );
+        mutexContainer.add(createMutexDisplay("File Access"));
+        mutexContainer.add(Box.createVerticalStrut(5));
+        mutexContainer.add(createMutexDisplay("User Input"));
+        mutexContainer.add(Box.createVerticalStrut(5));
+        mutexContainer.add(createMutexDisplay("User Output"));
+        mutexContainer.add(Box.createVerticalGlue());
         
-        this.getChildren().add(mutexContainer);
+        JScrollPane scrollPane = new JScrollPane(mutexContainer);
+        scrollPane.getVerticalScrollBar().setUnitIncrement(10);
+        this.add(scrollPane, BorderLayout.CENTER);
     }
     
     /**
      * Create visual display for a single mutex
      */
-    private VBox createMutexDisplay(String resourceName) {
-        VBox mutexBox = new VBox(5);
-        mutexBox.setPadding(new Insets(10));
-        mutexBox.setStyle(
-            "-fx-border-color: #999999; " +
-            "-fx-border-width: 1; " +
-            "-fx-border-radius: 3; " +
-            "-fx-background-color: #ffffff;"
-        );
+    private JPanel createMutexDisplay(String resourceName) {
+        JPanel mutexBox = new JPanel();
+        mutexBox.setLayout(new BoxLayout(mutexBox, BoxLayout.Y_AXIS));
+        mutexBox.setBackground(Color.WHITE);
+        mutexBox.setBorder(BorderFactory.createLineBorder(new Color(153, 153, 153), 1));
         
-        // Resource name
-        Label nameLabel = new Label(resourceName);
-        nameLabel.setStyle("-fx-font-size: 12px; -fx-font-weight: bold;");
+        mutexBox.setBorder(BorderFactory.createTitledBorder(resourceName));
         
         // Status (locked/free)
-        Label statusLabel = new Label("🟢 Free");
-        statusLabel.setStyle("-fx-font-size: 11px;");
-        statusLabel.setId("status_" + resourceName);
+        JLabel statusLabel = new JLabel("● Free");
+        statusLabel.setFont(new Font("Arial", Font.PLAIN, 11));
+        statusLabel.setForeground(new Color(0, 153, 0));
+        statusLabel.setName("status_" + resourceName);
         
         // Owner
-        Label ownerLabel = new Label("Owner: None");
-        ownerLabel.setStyle("-fx-font-size: 10px;");
-        ownerLabel.setId("owner_" + resourceName);
+        JLabel ownerLabel = new JLabel("Owner: None");
+        ownerLabel.setFont(new Font("Arial", Font.PLAIN, 10));
+        ownerLabel.setName("owner_" + resourceName);
         
         // Wait queue
-        Label waitLabel = new Label("Waiting: 0 processes");
-        waitLabel.setStyle("-fx-font-size: 10px;");
-        waitLabel.setId("wait_" + resourceName);
+        JLabel waitLabel = new JLabel("Waiting: 0 processes");
+        waitLabel.setFont(new Font("Arial", Font.PLAIN, 10));
+        waitLabel.setName("wait_" + resourceName);
         
-        mutexBox.getChildren().addAll(nameLabel, statusLabel, ownerLabel, waitLabel);
+        mutexBox.add(statusLabel);
+        mutexBox.add(ownerLabel);
+        mutexBox.add(waitLabel);
         return mutexBox;
     }
     

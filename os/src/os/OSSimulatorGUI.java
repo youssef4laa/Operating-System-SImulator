@@ -1,334 +1,466 @@
 package os;
 
-import javafx.application.Application;
-import javafx.application.Platform;
-import javafx.geometry.Insets;
-import javafx.scene.Scene;
-import javafx.scene.control.*;
-import javafx.scene.layout.*;
-import javafx.stage.Stage;
-import javafx.animation.Timeline;
-import javafx.animation.KeyFrame;
-import javafx.util.Duration;
+import javax.swing.*;
+import javax.swing.event.ChangeEvent;
+import javax.swing.event.ChangeListener;
+import java.awt.*;
+import java.awt.event.ActionEvent;
+import java.awt.event.WindowAdapter;
+import java.awt.event.WindowEvent;
+import java.util.Timer;
+import java.util.TimerTask;
 
 /**
- * OSSimulatorGUI - JavaFX main application for OS visualization
- * Displays: Memory, Queues, Processes, Mutexes, System Calls, Scheduler
+ * OSSimulatorGUI - Swing main application for OS visualization
+ * Displays: Memory, Queues, Processes, Mutexes, System Calls, Scheduler, Debug Console
  * Supports: Step-through and Automatic execution modes
+ * Integrates with SimulationEngine for proper state management
  */
-public class OSSimulatorGUI extends Application {
+public class OSSimulatorGUI extends JFrame {
     
-    private Stage primaryStage;
-    private Scheduler scheduler;
-    private Memory memory;
-    private Timeline animationTimeline;
+    private SimulationEngine engine;
+    private Timer automationTimer;
     
     // UI Components
     private MemoryVisualization memoryPanel;
     private QueueVisualization readyQueuePanel;
     private QueueVisualization blockedQueuePanel;
     private CurrentProcessPanel currentProcessPanel;
-    private ControlPanel controlPanel;
     private MutexStatusPanel mutexPanel;
     private SystemCallStatsPanel statsPanel;
+    private TimelinePanel timelinePanel;
+    private DebugConsole debugConsole;
+    
+    // Control elements
+    private JComboBox<String> algorithmSelector;
+    private JLabel statusLabel;
+    private ButtonGroup modeGroup;
+    private JSlider speedSlider;
+    private JLabel speedValue;
     
     // Execution state
     private boolean executionPaused = true;
     private boolean stepMode = true;
-    private double executionSpeed = 1.0; // 1.0 = normal, 0.5 = slow, 2.0 = fast
+    private double executionSpeed = 1.0;
     
-    @Override
-    public void start(Stage primaryStage) throws Exception {
-        this.primaryStage = primaryStage;
+    public OSSimulatorGUI() {
+        // Initialize debug console first to capture output
+        debugConsole = new DebugConsole();
         
-        // Initialize backend
-        memory = new Memory();
-        scheduler = new Scheduler();
+        // Initialize simulation engine
+        engine = new SimulationEngine(debugConsole);
+        
+        // Setup listener for GUI updates
+        engine.setListener(new SimulationEngine.SimulationListener() {
+            @Override
+            public void onInitialized() {
+                updateAll();
+            }
+            
+            @Override
+            public void onStarted() {
+                updateStatusLabel("Running");
+            }
+            
+            @Override
+            public void onStepComplete() {
+                updateAll();
+            }
+            
+            @Override
+            public void onPaused() {
+                updateStatusLabel("Paused");
+            }
+            
+            @Override
+            public void onResumed() {
+                updateStatusLabel("Running");
+            }
+            
+            @Override
+            public void onCompleted() {
+                updateStatusLabel("Completed");
+                pauseExecution();
+            }
+            
+            @Override
+            public void onReset() {
+                updateAll();
+                updateStatusLabel("Ready");
+            }
+            
+            @Override
+            public void onStateChanged(Scheduler scheduler, Memory memory, int clockCycle) {
+                updateAll();
+            }
+        });
+        
+        // Setup window
+        this.setTitle("Operating System Simulator - CSEN 602 (Spring 2026)");
+        this.setSize(1600, 1000);
+        this.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        this.setLocationRelativeTo(null);
+        this.addWindowListener(new WindowAdapter() {
+            @Override
+            public void windowClosing(WindowEvent e) {
+                shutdown();
+            }
+        });
         
         // Create main layout
-        BorderPane root = createMainLayout();
-        
-        // Create scene
-        Scene scene = new Scene(root, 1400, 900);
-        
-        // Setup stage
-        primaryStage.setTitle("Operating System Simulator - CSEN 602");
-        primaryStage.setScene(scene);
-        primaryStage.setOnCloseRequest(e -> shutdown());
-        primaryStage.show();
-    }
-    
-    /**
-     * Create the main layout with all panels
-     */
-    private BorderPane createMainLayout() {
-        BorderPane root = new BorderPane();
-        root.setPadding(new Insets(10));
+        Container contentPane = this.getContentPane();
+        contentPane.setLayout(new BorderLayout(10, 10));
+        ((JPanel) contentPane).setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
         
         // Top: Header and controls
-        VBox top = createHeader();
-        root.setTop(top);
+        JPanel top = createHeader();
+        contentPane.add(top, BorderLayout.NORTH);
         
-        // Center: Main content (left: memory/queues, middle: current process, right: stats)
-        HBox center = createCenterContent();
-        root.setCenter(center);
+        // Center: Main content in JSplitPane
+        JSplitPane centerSplit = createCenterContent();
+        contentPane.add(centerSplit, BorderLayout.CENTER);
         
-        // Bottom: Control buttons
-        HBox bottom = createControlButtons();
-        root.setBottom(bottom);
+        // Bottom: Status bar
+        JPanel bottom = createStatusBar();
+        contentPane.add(bottom, BorderLayout.SOUTH);
         
-        return root;
+        updateStatusLabel("Ready");
     }
     
     /**
      * Create header with title and algorithm selector
      */
-    private VBox createHeader() {
-        VBox header = new VBox(10);
-        header.setStyle("-fx-border-color: #cccccc; -fx-border-width: 0 0 2 0; -fx-padding: 10;");
+    private JPanel createHeader() {
+        JPanel header = new JPanel();
+        header.setLayout(new BoxLayout(header, BoxLayout.Y_AXIS));
+        header.setBorder(BorderFactory.createMatteBorder(0, 0, 2, 0, new Color(204, 204, 204)));
+        header.add(Box.createVerticalStrut(10));
         
-        Label titleLabel = new Label("Operating System Simulator - CSEN 602 (Spring 2026)");
-        titleLabel.setStyle("-fx-font-size: 18px; -fx-font-weight: bold;");
+        JLabel titleLabel = new JLabel("Operating System Simulator - CSEN 602 (Spring 2026)");
+        titleLabel.setFont(new Font("Arial", Font.BOLD, 18));
+        header.add(titleLabel);
         
-        // Algorithm selector
-        HBox algorithmBox = new HBox(10);
-        Label algoLabel = new Label("Algorithm:");
-        ComboBox<String> algoSelector = new ComboBox<>();
-        algoSelector.getItems().addAll("RR", "HRRN", "MLFQ");
-        algoSelector.setValue("RR");
-        algoSelector.setOnAction(e -> {
-            scheduler.algorithm = algoSelector.getValue();
-            updateAll();
+        header.add(Box.createVerticalStrut(10));
+        
+        // Algorithm selector and controls
+        JPanel algorithmBox = new JPanel();
+        algorithmBox.setLayout(new FlowLayout(FlowLayout.LEFT, 15, 0));
+        
+        JLabel algoLabel = new JLabel("Algorithm:");
+        algoLabel.setFont(new Font("Arial", Font.BOLD, 11));
+        
+        algorithmSelector = new JComboBox<>(new String[]{"RR", "HRRN", "MLFQ"});
+        algorithmSelector.setSelectedItem("RR");
+        algorithmSelector.setPreferredSize(new Dimension(80, 25));
+        algorithmSelector.addActionListener(e -> engine.reset());
+        
+        JLabel modeLabel = new JLabel("Mode:");
+        modeLabel.setFont(new Font("Arial", Font.BOLD, 11));
+        
+        modeGroup = new ButtonGroup();
+        JRadioButton stepButton = new JRadioButton("Step", true);
+        JRadioButton autoButton = new JRadioButton("Auto", false);
+        modeGroup.add(stepButton);
+        modeGroup.add(autoButton);
+        stepButton.addActionListener(e -> {
+            stepMode = true;
+            pauseExecution();
+        });
+        autoButton.addActionListener(e -> {
+            stepMode = false;
         });
         
-        algorithmBox.getChildren().addAll(algoLabel, algoSelector);
+        JLabel speedLabel = new JLabel("Speed:");
+        speedLabel.setFont(new Font("Arial", Font.BOLD, 11));
         
-        header.getChildren().addAll(titleLabel, algorithmBox);
+        speedSlider = new JSlider(10, 300, 100);
+        speedSlider.setPreferredSize(new Dimension(100, 25));
+        speedSlider.addChangeListener(e -> {
+            executionSpeed = speedSlider.getValue() / 100.0;
+            speedValue.setText(String.format("%.1fx", executionSpeed));
+        });
+        
+        speedValue = new JLabel("1.0x");
+        speedValue.setFont(new Font("Arial", Font.PLAIN, 10));
+        
+        algorithmBox.add(algoLabel);
+        algorithmBox.add(algorithmSelector);
+        algorithmBox.add(new JSeparator(SwingConstants.VERTICAL));
+        algorithmBox.add(modeLabel);
+        algorithmBox.add(stepButton);
+        algorithmBox.add(autoButton);
+        algorithmBox.add(new JSeparator(SwingConstants.VERTICAL));
+        algorithmBox.add(speedLabel);
+        algorithmBox.add(speedSlider);
+        algorithmBox.add(speedValue);
+        
+        header.add(algorithmBox);
+        header.add(Box.createVerticalStrut(10));
+        
         return header;
     }
     
     /**
-     * Create center content with three columns
+     * Create center content with split panes
      */
-    private HBox createCenterContent() {
-        HBox center = new HBox(10);
+    private JSplitPane createCenterContent() {
+        JSplitPane mainSplit = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT);
+        mainSplit.setResizeWeight(0.0);
         
-        // Left column: Memory and Queues
-        VBox leftPanel = createLeftPanel();
+        // Left: Memory and Queues
+        JPanel leftPanel = createLeftPanel();
+        mainSplit.setLeftComponent(leftPanel);
         
-        // Middle column: Current Process
-        VBox middlePanel = createMiddlePanel();
+        // Right: Middle + Right panels in another split
+        JSplitPane rightSplit = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT);
+        rightSplit.setResizeWeight(0.3);
         
-        // Right column: Stats and Mutexes
-        VBox rightPanel = createRightPanel();
+        JPanel middlePanel = createMiddlePanel();
+        rightSplit.setLeftComponent(middlePanel);
         
-        // Set grow priorities
-        HBox.setHgrow(leftPanel, Priority.SOMETIMES);
-        HBox.setHgrow(middlePanel, Priority.SOMETIMES);
-        HBox.setHgrow(rightPanel, Priority.SOMETIMES);
+        JPanel rightPanel = createRightPanel();
+        rightSplit.setRightComponent(rightPanel);
         
-        center.getChildren().addAll(leftPanel, middlePanel, rightPanel);
-        return center;
+        mainSplit.setRightComponent(rightSplit);
+        mainSplit.setDividerLocation(300);
+        rightSplit.setDividerLocation(350);
+        
+        return mainSplit;
     }
     
     /**
      * Create left panel with memory and queues
      */
-    private VBox createLeftPanel() {
-        VBox panel = new VBox(10);
-        panel.setStyle("-fx-border-color: #dddddd; -fx-border-radius: 5; -fx-padding: 10;");
+    private JPanel createLeftPanel() {
+        JPanel panel = new JPanel();
+        panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
+        panel.setBorder(BorderFactory.createLineBorder(new Color(221, 221, 221), 1));
+        panel.setPreferredSize(new Dimension(300, 0));
+        
+        JLabel sectionLabel = new JLabel("System State");
+        sectionLabel.setFont(new Font("Arial", Font.BOLD, 13));
+        panel.add(sectionLabel);
+        panel.add(Box.createVerticalStrut(5));
         
         // Memory visualization
-        Label memoryLabel = new Label("Memory (40 words)");
-        memoryLabel.setStyle("-fx-font-size: 14px; -fx-font-weight: bold;");
-        memoryPanel = new MemoryVisualization(memory);
+        JLabel memoryLabel = new JLabel("Memory (40 words)");
+        memoryLabel.setFont(new Font("Arial", Font.BOLD, 11));
+        memoryPanel = new MemoryVisualization(engine.getMemory());
+        
+        JScrollPane memScroll = new JScrollPane(memoryPanel);
+        memScroll.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED);
+        memScroll.setPreferredSize(new Dimension(0, 180));
+        
+        panel.add(memoryLabel);
+        panel.add(memScroll);
+        panel.add(Box.createVerticalStrut(5));
         
         // Ready Queue
-        Label readyLabel = new Label("Ready Queue");
-        readyLabel.setStyle("-fx-font-size: 12px; -fx-font-weight: bold;");
-        readyQueuePanel = new QueueVisualization("Ready", scheduler.readyQueue);
+        JLabel readyLabel = new JLabel("Ready Queue");
+        readyLabel.setFont(new Font("Arial", Font.BOLD, 11));
+        readyQueuePanel = new QueueVisualization("Ready", engine.getScheduler().readyQueue);
+        
+        panel.add(readyLabel);
+        panel.add(readyQueuePanel);
+        panel.add(Box.createVerticalStrut(5));
         
         // Blocked Queue
-        Label blockedLabel = new Label("Blocked Queue");
-        blockedLabel.setStyle("-fx-font-size: 12px; -fx-font-weight: bold;");
-        blockedQueuePanel = new QueueVisualization("Blocked", scheduler.blockedQueue);
+        JLabel blockedLabel = new JLabel("Blocked Queue");
+        blockedLabel.setFont(new Font("Arial", Font.BOLD, 11));
+        blockedQueuePanel = new QueueVisualization("Blocked", engine.getScheduler().blockedQueue);
         
-        panel.getChildren().addAll(
-            memoryLabel, memoryPanel,
-            new Separator(),
-            readyLabel, readyQueuePanel,
-            blockedLabel, blockedQueuePanel
-        );
+        panel.add(blockedLabel);
+        panel.add(blockedQueuePanel);
+        panel.add(Box.createVerticalGlue());
         
-        VBox.setVgrow(memoryPanel, Priority.SOMETIMES);
         return panel;
     }
     
     /**
-     * Create middle panel with current process info
+     * Create middle panel with debug console
      */
-    private VBox createMiddlePanel() {
-        VBox panel = new VBox(10);
-        panel.setStyle("-fx-border-color: #dddddd; -fx-border-radius: 5; -fx-padding: 10;");
+    private JPanel createMiddlePanel() {
+        JPanel panel = new JPanel();
+        panel.setLayout(new BorderLayout(10, 10));
+        panel.setBorder(BorderFactory.createLineBorder(new Color(221, 221, 221), 1));
         
-        Label currentLabel = new Label("Current Process");
-        currentLabel.setStyle("-fx-font-size: 14px; -fx-font-weight: bold;");
+        // Add debug console
+        debugConsole.setPreferredSize(new Dimension(0, 350));
+        panel.add(debugConsole, BorderLayout.CENTER);
         
+        // Control buttons
+        JPanel controlButtonsBox = createControlButtons();
+        panel.add(controlButtonsBox, BorderLayout.SOUTH);
+        
+        return panel;
+    }
+    
+    /**
+     * Create right panel with process info, stats, and timeline
+     */
+    private JPanel createRightPanel() {
+        JPanel panel = new JPanel();
+        panel.setLayout(new BorderLayout());
+        panel.setBorder(BorderFactory.createLineBorder(new Color(221, 221, 221), 1));
+        
+        // TabbedPane for different views
+        JTabbedPane tabPane = new JTabbedPane();
+        
+        // Tab 1: Current Process
         currentProcessPanel = new CurrentProcessPanel();
+        tabPane.addTab("Process", currentProcessPanel);
         
-        panel.getChildren().addAll(currentLabel, currentProcessPanel);
-        VBox.setVgrow(currentProcessPanel, Priority.ALWAYS);
+        // Tab 2: Timeline
+        timelinePanel = new TimelinePanel();
+        tabPane.addTab("Timeline", timelinePanel);
         
-        return panel;
-    }
-    
-    /**
-     * Create right panel with stats and mutex status
-     */
-    private VBox createRightPanel() {
-        VBox panel = new VBox(10);
-        panel.setStyle("-fx-border-color: #dddddd; -fx-border-radius: 5; -fx-padding: 10;");
-        
-        // Mutexes
-        Label mutexLabel = new Label("Mutex Status");
-        mutexLabel.setStyle("-fx-font-size: 14px; -fx-font-weight: bold;");
+        // Tab 3: Mutexes
         mutexPanel = new MutexStatusPanel();
+        tabPane.addTab("Mutexes", mutexPanel);
         
-        // Statistics
-        Label statsLabel = new Label("System Call Statistics");
-        statsLabel.setStyle("-fx-font-size: 14px; -fx-font-weight: bold;");
+        // Tab 4: Statistics
         statsPanel = new SystemCallStatsPanel();
+        tabPane.addTab("Statistics", statsPanel);
         
-        panel.getChildren().addAll(
-            mutexLabel, mutexPanel,
-            new Separator(),
-            statsLabel, statsPanel
-        );
-        
-        VBox.setVgrow(mutexPanel, Priority.SOMETIMES);
-        VBox.setVgrow(statsPanel, Priority.SOMETIMES);
+        panel.add(tabPane, BorderLayout.CENTER);
         
         return panel;
     }
     
     /**
-     * Create bottom control buttons
+     * Create control buttons
      */
-    private HBox createControlButtons() {
-        HBox buttons = new HBox(10);
-        buttons.setPadding(new Insets(10));
-        buttons.setStyle("-fx-border-color: #cccccc; -fx-border-width: 2 0 0 0;");
+    private JPanel createControlButtons() {
+        JPanel buttons = new JPanel();
+        buttons.setLayout(new FlowLayout(FlowLayout.LEFT, 10, 8));
+        buttons.setBorder(BorderFactory.createMatteBorder(1, 0, 0, 0, new Color(224, 224, 224)));
         
-        // Mode selector
-        Label modeLabel = new Label("Mode:");
-        ToggleGroup modeGroup = new ToggleGroup();
-        RadioButton stepButton = new RadioButton("Step-Through");
-        RadioButton autoButton = new RadioButton("Automatic");
-        stepButton.setToggleGroup(modeGroup);
-        autoButton.setToggleGroup(modeGroup);
-        stepButton.setSelected(true);
+        JButton initButton = new JButton("Initialize");
+        initButton.setFont(new Font("Arial", Font.PLAIN, 11));
+        initButton.addActionListener(e -> initializeSimulation());
         
-        // Speed control
-        Label speedLabel = new Label("Speed:");
-        Slider speedSlider = new Slider(0.1, 3.0, 1.0);
-        speedSlider.setStyle("-fx-control-inner-background: #e0e0e0;");
-        Label speedValue = new Label("1.0x");
-        speedSlider.valueProperty().addListener((obs, oldVal, newVal) -> {
-            executionSpeed = newVal.doubleValue();
-            speedValue.setText(String.format("%.1fx", executionSpeed));
-        });
+        JButton startButton = new JButton("Start");
+        startButton.setFont(new Font("Arial", Font.PLAIN, 11));
+        startButton.addActionListener(e -> startExecution());
         
-        // Execution buttons
-        Button startButton = new Button("Start");
-        startButton.setStyle("-fx-font-size: 12px; -fx-padding: 8px 20px;");
-        startButton.setOnAction(e -> startExecution());
+        JButton stepButton = new JButton("Step");
+        stepButton.setFont(new Font("Arial", Font.PLAIN, 11));
+        stepButton.addActionListener(e -> executeOneStep());
         
-        Button stepButton2 = new Button("Step");
-        stepButton2.setStyle("-fx-font-size: 12px; -fx-padding: 8px 20px;");
-        stepButton2.setOnAction(e -> executeOneStep());
+        JButton pauseButton = new JButton("Pause");
+        pauseButton.setFont(new Font("Arial", Font.PLAIN, 11));
+        pauseButton.addActionListener(e -> pauseExecution());
         
-        Button pauseButton = new Button("Pause");
-        pauseButton.setStyle("-fx-font-size: 12px; -fx-padding: 8px 20px;");
-        pauseButton.setOnAction(e -> pauseExecution());
+        JButton resumeButton = new JButton("Resume");
+        resumeButton.setFont(new Font("Arial", Font.PLAIN, 11));
+        resumeButton.addActionListener(e -> resumeExecution());
         
-        Button resumeButton = new Button("Resume");
-        resumeButton.setStyle("-fx-font-size: 12px; -fx-padding: 8px 20px;");
-        resumeButton.setOnAction(e -> resumeExecution());
+        JButton resetButton = new JButton("Reset");
+        resetButton.setFont(new Font("Arial", Font.PLAIN, 11));
+        resetButton.addActionListener(e -> resetSimulation());
         
-        Button resetButton = new Button("Reset");
-        resetButton.setStyle("-fx-font-size: 12px; -fx-padding: 8px 20px;");
-        resetButton.setOnAction(e -> resetSimulation());
+        buttons.add(initButton);
+        buttons.add(startButton);
+        buttons.add(stepButton);
+        buttons.add(pauseButton);
+        buttons.add(resumeButton);
+        buttons.add(resetButton);
         
-        buttons.getChildren().addAll(
-            modeLabel, stepButton, autoButton,
-            speedLabel, speedSlider, speedValue,
-            new Separator(),
-            startButton, stepButton2, pauseButton, resumeButton, resetButton
-        );
+        // Add spacer and status
+        buttons.add(Box.createHorizontalGlue());
+        JLabel statusLabelText = new JLabel("Status: ");
+        statusLabelText.setFont(new Font("Arial", Font.PLAIN, 11));
+        buttons.add(statusLabelText);
+        statusLabel = new JLabel("Ready");
+        statusLabel.setFont(new Font("Arial", Font.PLAIN, 11));
+        buttons.add(statusLabel);
         
         return buttons;
     }
     
     /**
-     * Start execution in selected mode
+     * Create status bar
+     */
+    private JPanel createStatusBar() {
+        JPanel statusBar = new JPanel();
+        statusBar.setLayout(new FlowLayout(FlowLayout.LEFT, 20, 8));
+        statusBar.setBorder(BorderFactory.createMatteBorder(1, 0, 0, 0, new Color(204, 204, 204)));
+        statusBar.setBackground(new Color(245, 245, 245));
+        
+        JLabel readyCountLabel = new JLabel("Ready: 0");
+        JLabel blockedCountLabel = new JLabel("Blocked: 0");
+        JLabel finishedCountLabel = new JLabel("Finished: 0");
+        JLabel clockLabel = new JLabel("Clock Cycle: 0");
+        
+        statusBar.add(clockLabel);
+        statusBar.add(readyCountLabel);
+        statusBar.add(blockedCountLabel);
+        statusBar.add(finishedCountLabel);
+        
+        return statusBar;
+    }
+    
+    /**
+     * Initialize simulation
+     */
+    private void initializeSimulation() {
+        String algorithm = (String) algorithmSelector.getSelectedItem();
+        engine.initialize(algorithm);
+        debugConsole.log("Simulation initialized with " + algorithm + " algorithm");
+        updateStatusLabel("Initialized");
+    }
+    
+    /**
+     * Start execution
      */
     private void startExecution() {
+        if (!engine.isRunning()) {
+            engine.start();
+        }
         executionPaused = false;
         if (!stepMode) {
             startAutomaticExecution();
         }
+        updateStatusLabel("Running");
     }
     
     /**
-     * Execute one step in step-through mode
+     * Execute one step
      */
     private void executeOneStep() {
-        if (scheduler.readyQueue.isEmpty() && scheduler.blockedQueue.isEmpty()) {
-            showAlert("Simulation Complete", "All processes have finished.");
-            return;
-        }
-        try {
-            // Execute one clock cycle
-            scheduler.start(memory);
-            updateAll();
-        } catch (Exception e) {
-            showAlert("Execution Error", e.getMessage());
-        }
+        engine.step();
     }
     
     /**
-     * Start automatic execution with timeline
+     * Start automatic execution
      */
     private void startAutomaticExecution() {
-        if (animationTimeline != null) {
-            animationTimeline.stop();
+        if (automationTimer != null) {
+            automationTimer.cancel();
         }
         
-        // Calculate duration based on speed
-        long durationMs = (long) (500 / executionSpeed); // 500ms base, adjusted by speed
+        long delayMs = (long) (500 / executionSpeed);
         
-        animationTimeline = new Timeline(
-            new KeyFrame(Duration.millis(durationMs), e -> {
-                try {
-                    if (!executionPaused) {
-                        executeOneStep();
-                    }
-                } catch (Exception ex) {
-                    ex.printStackTrace();
+        automationTimer = new Timer();
+        automationTimer.scheduleAtFixedRate(new TimerTask() {
+            @Override
+            public void run() {
+                if (!executionPaused) {
+                    executeOneStep();
                 }
-            })
-        );
-        animationTimeline.setCycleCount(Timeline.INDEFINITE);
-        animationTimeline.play();
+            }
+        }, delayMs, delayMs);
     }
     
     /**
      * Pause execution
      */
     private void pauseExecution() {
+        engine.pause();
         executionPaused = true;
-        if (animationTimeline != null) {
-            animationTimeline.stop();
+        if (automationTimer != null) {
+            automationTimer.cancel();
+            automationTimer = null;
         }
     }
     
@@ -336,48 +468,71 @@ public class OSSimulatorGUI extends Application {
      * Resume execution
      */
     private void resumeExecution() {
+        engine.resume();
         executionPaused = false;
-        startAutomaticExecution();
+        if (!stepMode) {
+            startAutomaticExecution();
+        }
     }
     
     /**
-     * Reset simulation to initial state
+     * Reset simulation
      */
     private void resetSimulation() {
         pauseExecution();
-        try {
-            memory = new Memory();
-            scheduler = new Scheduler();
-            updateAll();
-            showAlert("Reset", "Simulation reset to initial state.");
-        } catch (Exception e) {
-            showAlert("Reset Error", e.getMessage());
-        }
+        engine.reset();
+        debugConsole.clear();
+        updateStatusLabel("Reset");
+        JOptionPane.showMessageDialog(this, "Simulation reset to initial state", "Success", JOptionPane.INFORMATION_MESSAGE);
     }
     
     /**
      * Update all UI panels
      */
     private void updateAll() {
-        Platform.runLater(() -> {
-            memoryPanel.update(memory);
-            readyQueuePanel.update(scheduler.readyQueue);
-            blockedQueuePanel.update(scheduler.blockedQueue);
-            currentProcessPanel.update(scheduler);
+        SwingUtilities.invokeLater(() -> {
+            memoryPanel.update(engine.getMemory());
+            readyQueuePanel.update(engine.getScheduler().readyQueue);
+            blockedQueuePanel.update(engine.getScheduler().blockedQueue);
+            currentProcessPanel.update(engine.getScheduler());
             mutexPanel.update();
             statsPanel.update();
+            timelinePanel.update(
+                engine.getScheduler(),
+                engine.getMemory(),
+                engine.getClockCycle(),
+                engine.getInstructionsExecuted()
+            );
         });
     }
     
     /**
-     * Show alert dialog
+     * Update status label
      */
-    private void showAlert(String title, String message) {
-        Alert alert = new Alert(Alert.AlertType.INFORMATION);
-        alert.setTitle(title);
-        alert.setHeaderText(null);
-        alert.setContentText(message);
-        alert.showAndWait();
+    private void updateStatusLabel(String status) {
+        SwingUtilities.invokeLater(() -> {
+            statusLabel.setText(status);
+            
+            // Color based on status
+            switch (status) {
+                case "Running":
+                    statusLabel.setForeground(new Color(0, 153, 0));
+                    break;
+                case "Paused":
+                    statusLabel.setForeground(new Color(255, 153, 0));
+                    break;
+                case "Ready":
+                    statusLabel.setForeground(new Color(0, 102, 204));
+                    break;
+                case "Completed":
+                    statusLabel.setForeground(new Color(0, 153, 0));
+                    statusLabel.setFont(new Font("Arial", Font.BOLD, 11));
+                    break;
+                case "Error":
+                    statusLabel.setForeground(new Color(255, 0, 0));
+                    break;
+            }
+        });
     }
     
     /**
@@ -385,10 +540,14 @@ public class OSSimulatorGUI extends Application {
      */
     private void shutdown() {
         pauseExecution();
+        debugConsole.restore();
         System.exit(0);
     }
     
     public static void main(String[] args) {
-        launch(args);
+        SwingUtilities.invokeLater(() -> {
+            OSSimulatorGUI gui = new OSSimulatorGUI();
+            gui.setVisible(true);
+        });
     }
 }

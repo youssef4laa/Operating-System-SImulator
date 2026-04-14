@@ -1,74 +1,59 @@
 package os;
 
-import javafx.geometry.Insets;
-import javafx.scene.layout.*;
-import javafx.scene.control.*;
+import javax.swing.*;
+import javax.swing.table.DefaultTableModel;
+import java.awt.*;
 
 /**
  * SystemCallStatsPanel - Displays system call statistics
  * Shows: call count, success rate, error codes
  */
-public class SystemCallStatsPanel extends VBox {
+public class SystemCallStatsPanel extends JPanel {
     
-    private TableView<CallStatRow> statsTable;
+    private JTable statsTable;
+    private DefaultTableModel tableModel;
     
     public SystemCallStatsPanel() {
-        super(10);
-        this.setPadding(new Insets(10));
-        this.setStyle("-fx-border-color: #dddddd; -fx-border-radius: 3; -fx-background-color: #fafafa;");
+        this.setLayout(new BorderLayout(10, 10));
+        this.setBorder(BorderFactory.createLineBorder(new Color(221, 221, 221), 1));
+        this.setBackground(new Color(250, 250, 250));
         
         createStatsTable();
-        this.getChildren().add(statsTable);
+        JScrollPane scrollPane = new JScrollPane(statsTable);
+        this.add(scrollPane, BorderLayout.CENTER);
     }
     
     /**
      * Create table for system call statistics
      */
     private void createStatsTable() {
-        statsTable = new TableView<>();
-        statsTable.setPrefHeight(200);
+        // Create table model with columns
+        String[] columnNames = {"Call", "Total", "Success", "Failure", "% Success"};
+        tableModel = new DefaultTableModel(columnNames, 0) {
+            @Override
+            public boolean isCellEditable(int row, int col) {
+                return false;
+            }
+        };
         
-        // Call name column
-        TableColumn<CallStatRow, String> callColumn = new TableColumn<>("Call");
-        callColumn.setCellValueFactory(cellData -> 
-            new javafx.beans.property.SimpleStringProperty(cellData.getValue().callName));
-        callColumn.setPrefWidth(80);
+        // Create JTable with the model
+        statsTable = new JTable(tableModel);
+        statsTable.setFont(new Font("Arial", Font.PLAIN, 11));
+        statsTable.setRowHeight(25);
+        statsTable.getTableHeader().setFont(new Font("Arial", Font.BOLD, 11));
         
-        // Total calls column
-        TableColumn<CallStatRow, Integer> totalColumn = new TableColumn<>("Total");
-        totalColumn.setCellValueFactory(cellData -> 
-            new javafx.beans.property.SimpleObjectProperty<>(cellData.getValue().total));
-        totalColumn.setPrefWidth(60);
+        // Set column widths
+        statsTable.getColumnModel().getColumn(0).setPreferredWidth(80);
+        statsTable.getColumnModel().getColumn(1).setPreferredWidth(60);
+        statsTable.getColumnModel().getColumn(2).setPreferredWidth(70);
+        statsTable.getColumnModel().getColumn(3).setPreferredWidth(70);
+        statsTable.getColumnModel().getColumn(4).setPreferredWidth(80);
         
-        // Success column
-        TableColumn<CallStatRow, Integer> successColumn = new TableColumn<>("Success");
-        successColumn.setCellValueFactory(cellData -> 
-            new javafx.beans.property.SimpleObjectProperty<>(cellData.getValue().success));
-        successColumn.setPrefWidth(70);
-        
-        // Failure column
-        TableColumn<CallStatRow, Integer> failureColumn = new TableColumn<>("Failure");
-        failureColumn.setCellValueFactory(cellData -> 
-            new javafx.beans.property.SimpleObjectProperty<>(cellData.getValue().failure));
-        failureColumn.setPrefWidth(70);
-        
-        // Success rate column
-        TableColumn<CallStatRow, String> rateColumn = new TableColumn<>("% Success");
-        rateColumn.setCellValueFactory(cellData -> 
-            new javafx.beans.property.SimpleStringProperty(cellData.getValue().successRate));
-        rateColumn.setPrefWidth(80);
-        
-        statsTable.getColumns().addAll(callColumn, totalColumn, successColumn, failureColumn, rateColumn);
-        
-        // Add sample data
-        statsTable.getItems().addAll(
-            new CallStatRow("print", 0, 0, 0, "0%"),
-            new CallStatRow("readFile", 0, 0, 0, "0%"),
-            new CallStatRow("writeFile", 0, 0, 0, "0%"),
-            new CallStatRow("input", 0, 0, 0, "0%"),
-            new CallStatRow("readMemory", 0, 0, 0, "0%"),
-            new CallStatRow("writeMemory", 0, 0, 0, "0%")
-        );
+        // Add initial rows for each system call
+        String[] calls = {"print", "readFile", "writeFile", "input", "readMemory", "writeMemory"};
+        for (String call : calls) {
+            tableModel.addRow(new Object[]{call, 0, 0, 0, "0%"});
+        }
     }
     
     /**
@@ -86,35 +71,13 @@ public class SystemCallStatsPanel extends VBox {
                 int failure = total - success;
                 double rate = stats.getSuccessRate(calls[i]);
                 
-                CallStatRow row = statsTable.getItems().get(i);
-                row.total = total;
-                row.success = success;
-                row.failure = failure;
-                row.successRate = String.format("%.1f%%", rate);
+                tableModel.setValueAt(total, i, 1);
+                tableModel.setValueAt(success, i, 2);
+                tableModel.setValueAt(failure, i, 3);
+                tableModel.setValueAt(String.format("%.1f%%", rate), i, 4);
             }
-            
-            statsTable.refresh();
         } catch (Exception e) {
             e.printStackTrace();
-        }
-    }
-    
-    /**
-     * Data model for table rows
-     */
-    public static class CallStatRow {
-        public String callName;
-        public int total;
-        public int success;
-        public int failure;
-        public String successRate;
-        
-        public CallStatRow(String callName, int total, int success, int failure, String successRate) {
-            this.callName = callName;
-            this.total = total;
-            this.success = success;
-            this.failure = failure;
-            this.successRate = successRate;
         }
     }
 }
