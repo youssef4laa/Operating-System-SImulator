@@ -10,15 +10,24 @@ public class Process {
 
     /**
      * Creates a process by reading the program file and allocating memory.
-     * Allocates space for: PCB + instructions + 3 variables
+     * Dynamically allocates space for: PCB + instructions + 10 variable slots
      * Implements swap logic if memory is insufficient
      */
     public static PCB createProcess(String fileName, Memory memory) throws Exception {
         try {
             BufferedReader br = new BufferedReader(new FileReader(fileName));
             
-            // Calculate required space: PCB + instructions + 3 variables (min 10 words)
-            int requiredSize = 15;
+            // Count instructions to calculate required space dynamically
+            List<String> instructions = new ArrayList<>();
+            String line;
+            while ((line = br.readLine()) != null) {
+                instructions.add(line);
+            }
+            br.close();
+            
+            // Calculate required size: 1 (PCB) + instructionCount + 10 (variable slots)
+            int instructionCount = instructions.size();
+            int requiredSize = 1 + instructionCount + 10;
             
             // Validate size
             if (!MemoryManager.validateAllocationSize(requiredSize, memory)) {
@@ -39,36 +48,29 @@ public class Process {
             int current = start;
             
             // Create PCB
-            PCB pcb = new PCB(nextID++, start, start + 14);
+            PCB pcb = new PCB(nextID++, start, start + requiredSize - 1);
             
             // Store PCB at first position
             memory.write(current++, pcb);
             
-            // Read and store instructions (un-parsed lines)
-            List<String> instructions = new ArrayList<>();
-            String line;
-            while ((line = br.readLine()) != null) {
-                instructions.add(line);
-                memory.write(current++, line);
+            // Store instructions (already read above)
+            for (String instruction : instructions) {
+                memory.write(current++, instruction);
             }
-            br.close();
             
             // Store instruction list in PCB
             pcb.instructionList = instructions;
             pcb.totalInstructions = instructions.size();
             
-            // Initialize 3 variable slots in memory
+            // Initialize variable slots in memory (empty/null)
             // Variables will be accessed via symbol table (name -> memory index)
-            int var1Address = current;
-            int var2Address = current + 1;
-            int var3Address = current + 2;
+            // Reserve 10 slots for variables after instructions
+            for (int i = 0; i < 10; i++) {
+                memory.write(current++, null); // Initially empty
+            }
             
-            memory.write(var1Address, null); // Initially empty
-            memory.write(var2Address, null);
-            memory.write(var3Address, null);
-            
-            // Update PCB bounds to reflect actual usage
-            pcb.maxBound = current + 2;
+            // Update PCB bounds to reflect actual usage (already set in PCB constructor)
+            // But we already set maxBound correctly: start + requiredSize - 1
             pcb.allocationSize = pcb.maxBound - pcb.minBound + 1;
             
             // Calculate remaining time (approximate burst time)

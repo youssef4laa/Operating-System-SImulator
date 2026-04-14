@@ -44,6 +44,10 @@ public class Interpreter {
                 return;
             }
             
+            // Detect if this is a retry of the same instruction
+            boolean isRetry = instructionLine.equals(pcb.lastExecutedInstructionLine);
+            pcb.isRetryingInstruction = isRetry;
+            
             // Decode instruction
             Parser.Instruction instruction = Parser.parseInstruction(instructionLine);
             
@@ -60,6 +64,9 @@ public class Interpreter {
             
             // Execute instruction
             executeInstruction(instruction, pcb, memory);
+            
+            // Update last executed instruction (after successful execution or blocking)
+            pcb.lastExecutedInstructionLine = instructionLine;
             
             // CRITICAL: Handle blocking scenarios
             if (pcb.status.equals("Blocked")) {
@@ -133,14 +140,27 @@ public class Interpreter {
         
         // Check if value is special keyword "input"
         if (valueStr.equalsIgnoreCase("input")) {
+            // Suppress logging on retries
+            if (mutexUserInput != null) {
+                mutexUserInput.setSuppressLogging(pcb.isRetryingInstruction);
+            }
+            
             // Acquire user input mutex
             if (mutexUserInput != null) {
                 mutexUserInput.acquire(pcb, scheduler);
                 if (pcb.status.equals("Blocked")) return; // Blocked waiting for resource
             }
-            value = SystemCall.input();
+            
+            // Set process ID context for input dialog
+            SystemCall.setCurrentProcessId("P_" + pcb.processID);
+            // Suppress logging on retry of this instruction
+            value = SystemCall.input(pcb.isRetryingInstruction);
+            SystemCall.clearCurrentProcessId();
+            
             if (mutexUserInput != null) {
                 mutexUserInput.release(scheduler);
+                // Reset logging flag
+                mutexUserInput.setSuppressLogging(false);
             }
         } else if (Parser.isNumber(valueStr)) {
             // Numeric value

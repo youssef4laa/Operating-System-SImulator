@@ -20,13 +20,17 @@ public class PCB {
 	    public int totalInstructions;
 	    
 	    // Memory management
-	    public static final int MAX_VARIABLES_PER_PROCESS = 3;
-	    public int variableCount; // Track number of variables (max 3)
+	    public static final int MAX_VARIABLES_PER_PROCESS = 10;  // Increased to match dynamic allocation
+	    public int variableCount; // Track number of variables (max 10)
 	    public int allocationSize; // Total memory words allocated to this process
 	    
 	    // For MLFQ scheduling
 	    public int quantumUsed;
 	    public int currentQueueLevel;
+	    
+	    // Retry tracking to prevent duplicate logs
+	    public String lastExecutedInstructionLine = null;
+	    public boolean isRetryingInstruction = false;
 
 	    public PCB(int id, int min, int max) {
 	        this.processID = id;

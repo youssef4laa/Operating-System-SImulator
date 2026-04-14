@@ -14,6 +14,7 @@ public class Mutex {
 	private LinkedList<PCB> waitQueue = new LinkedList<>();  // Processes waiting for this mutex
 	private String resourceName = "Unknown";  // For logging/debugging
 	private int acquireCount = 0;  // Number of times this mutex has been acquired
+	private boolean suppressLogging = false;  // Suppress logs during retries
 	
 	public Mutex() {
 		this.resourceName = "Unknown";
@@ -21,6 +22,13 @@ public class Mutex {
 	
 	public Mutex(String name) {
 		this.resourceName = name;
+	}
+	
+	/**
+	 * Set whether to suppress logging output (for instruction retries)
+	 */
+	public void setSuppressLogging(boolean suppress) {
+		this.suppressLogging = suppress;
 	}
 
 	/**
@@ -38,15 +46,19 @@ public class Mutex {
 			isLocked = true;
 			owner = p;
 			acquireCount++;
-			System.out.println("  [MUTEX] Process " + p.processID + " acquired mutex '" + 
-				resourceName + "' (count: " + acquireCount + ")");
+			if (!suppressLogging) {
+				System.out.println("  [MUTEX] Process " + p.processID + " acquired mutex '" + 
+					resourceName + "' (count: " + acquireCount + ")");
+			}
 			return true;  // Process continues without blocking
 			
 		} else if (owner == p) {
 			// Same process trying to re-acquire - for now, we don't allow recursive locks
 			// (non-reentrant mutex). If we need reentrant, count acquisitions
-			System.out.println("  [MUTEX] WARNING: Process " + p.processID + 
-				" attempted to re-acquire mutex '" + resourceName + "' (already owns it)");
+			if (!suppressLogging) {
+				System.out.println("  [MUTEX] WARNING: Process " + p.processID + 
+					" attempted to re-acquire mutex '" + resourceName + "' (already owns it)");
+			}
 			return true;  // Allow immediate return without blocking
 			
 		} else {
@@ -55,9 +67,11 @@ public class Mutex {
 				waitQueue.add(p);
 				p.status = "Blocked";
 				scheduler.blockedQueue.add(p);
-				System.out.println("  [MUTEX] Process " + p.processID + " blocked on mutex '" + 
-					resourceName + "' (waiting for process " + owner.processID + ")");
-				System.out.println("  [MUTEX] Wait queue size: " + waitQueue.size());
+				if (!suppressLogging) {
+					System.out.println("  [MUTEX] Process " + p.processID + " blocked on mutex '" + 
+						resourceName + "' (waiting for process " + owner.processID + ")");
+					System.out.println("  [MUTEX] Wait queue size: " + waitQueue.size());
+				}
 			}
 			return false;  // Process is blocked
 		}
@@ -88,9 +102,11 @@ public class Mutex {
 			// Move from blocked queue to ready queue
 			if (scheduler.blockedQueue.remove(nextProcess)) {
 				scheduler.readyQueue.add(nextProcess);
-				System.out.println("  [MUTEX] Released to Process " + nextProcess.processID + 
-					" from mutex '" + resourceName + "' (next in queue)");
-				System.out.println("  [MUTEX] Wait queue size: " + waitQueue.size());
+				if (!suppressLogging) {
+					System.out.println("  [MUTEX] Released to Process " + nextProcess.processID + 
+						" from mutex '" + resourceName + "' (next in queue)");
+					System.out.println("  [MUTEX] Wait queue size: " + waitQueue.size());
+				}
 			} else {
 				System.err.println("  [MUTEX ERROR] Could not find released process in blocked queue");
 			}
@@ -98,7 +114,9 @@ public class Mutex {
 			// No waiting processes - unlock the mutex
 			isLocked = false;
 			owner = null;
-			System.out.println("  [MUTEX] Mutex '" + resourceName + "' is now unlocked");
+			if (!suppressLogging) {
+				System.out.println("  [MUTEX] Mutex '" + resourceName + "' is now unlocked");
+			}
 		}
 	}
 	

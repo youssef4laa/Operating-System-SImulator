@@ -53,6 +53,9 @@ public class OSSimulatorGUI extends JFrame {
         // Initialize simulation engine
         engine = new SimulationEngine(debugConsole);
         
+        // Enable GUI-based input popups for mutex operations
+        SystemCall.setInputProvider(new GUIInputProvider());
+        
         // Setup listener for GUI updates
         engine.setListener(new SimulationEngine.SimulationListener() {
             @Override

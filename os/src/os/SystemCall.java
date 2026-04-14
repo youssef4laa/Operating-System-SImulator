@@ -28,6 +28,12 @@ public class SystemCall {
     // Verbose logging flag
     private static boolean verboseLogging = true;
     
+    // Input provider for GUI popups (optional)
+    private static InputProvider inputProvider = null;
+    
+    // Current process ID for input context
+    private static String currentProcessId = null;
+    
     // Return codes
     public static final int SUCCESS = 0;
     public static final int FILE_NOT_FOUND = -1;
@@ -65,26 +71,64 @@ public class SystemCall {
     /**
      * System Call 4: Read text input from user
      * MUST be protected by mutexUserInput before calling
+     * Uses InputProvider if available (e.g., GUI popups), otherwise falls back to console Scanner
+     * 
+     * @param suppressLogging If true, skip logging (for instruction retries)
+     * @return User input string, or null on error
+     */
+    public static String input(boolean suppressLogging) {
+        try {
+            String inputValue;
+            
+            // Use GUI input provider if available, otherwise fallback to console Scanner
+            if (inputProvider != null) {
+                inputValue = inputProvider.provideInput(
+                    currentProcessId != null ? currentProcessId : "Unknown",
+                    "Please enter a value:"
+                );
+            } else {
+                System.out.print("Please enter a value: ");
+                System.out.flush();
+                inputValue = scanner.nextLine();
+            }
+            
+            if (inputValue == null) {
+                if (!suppressLogging) {
+                    logError("input: cancelled/null input");
+                }
+                stats.recordCall("input", INPUT_ERROR);
+                return null;
+            }
+            
+            stats.recordCall("input", SUCCESS);
+            if (!suppressLogging) {
+                logInfo("input: received '" + inputValue + "'");
+            }
+            return inputValue;
+        } catch (NoSuchElementException e) {
+            if (!suppressLogging) {
+                logError("input: no input available");
+            }
+            stats.recordCall("input", INPUT_ERROR);
+            return null;
+        } catch (Exception e) {
+            if (!suppressLogging) {
+                logError("input: " + e.getMessage());
+            }
+            stats.recordCall("input", INPUT_ERROR);
+            return null;
+        }
+    }
+
+    /**
+     * System Call 4: Read text input from user (overload for backward compatibility)
+     * MUST be protected by mutexUserInput before calling
+     * Uses InputProvider if available (e.g., GUI popups), otherwise falls back to console Scanner
      * 
      * @return User input string, or null on error
      */
     public static String input() {
-        try {
-            System.out.print("Please enter a value: ");
-            System.out.flush();
-            String inputValue = scanner.nextLine();
-            stats.recordCall("input", SUCCESS);
-            logInfo("input: received '" + inputValue + "'");
-            return inputValue;
-        } catch (NoSuchElementException e) {
-            logError("input: no input available");
-            stats.recordCall("input", INPUT_ERROR);
-            return null;
-        } catch (Exception e) {
-            logError("input: " + e.getMessage());
-            stats.recordCall("input", INPUT_ERROR);
-            return null;
-        }
+        return input(false);  // Default: enable logging
     }
 
     /**
@@ -310,5 +354,42 @@ public class SystemCall {
             scanner.close();
         }
         logInfo("System calls shutdown");
+    }
+    
+    // ============= INPUT PROVIDER METHODS =============
+    
+    /**
+     * Set the input provider for GUI-based input
+     * @param provider InputProvider implementation (e.g., GUIInputProvider)
+     */
+    public static void setInputProvider(InputProvider provider) {
+        inputProvider = provider;
+        if (provider != null) {
+            logInfo("Input provider set: " + provider.getClass().getSimpleName());
+        }
+    }
+    
+    /**
+     * Get current input provider
+     */
+    public static InputProvider getInputProvider() {
+        return inputProvider;
+    }
+    
+    /**
+     * Set current process ID for input context
+     * Called by Interpreter before calling input()
+     * @param processId ID of process requesting input
+     */
+    public static void setCurrentProcessId(String processId) {
+        currentProcessId = processId;
+    }
+    
+    /**
+     * Clear current process ID
+     * Called by Interpreter after input() completes
+     */
+    public static void clearCurrentProcessId() {
+        currentProcessId = null;
     }
 }
