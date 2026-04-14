@@ -34,11 +34,11 @@ public class Scheduler {
     private boolean processesArrived = false;
 
     /**
-     * Initializes scheduler and starts the main scheduling loop
+     * Initialize the Interpreter with mutex manager and scheduler
+     * Must be called before any process execution (semWait/semSignal)
+     * Separated from start() to support GUI initialization
      */
-    public void start(Memory mem) throws Exception {
-        this.memory = mem;
-        
+    public void initializeInterpreter() throws Exception {
         // Initialize mutex manager
         this.mutexManager = new MutexManager();
         this.mutexUserOutput = mutexManager.getUserOutputMutex();
@@ -47,6 +47,16 @@ public class Scheduler {
         
         // Initialize interpreter with scheduler and mutexes
         Interpreter.initialize(this, mutexUserOutput, mutexUserInput, mutexFile);
+    }
+
+    /**
+     * Initializes scheduler and starts the main scheduling loop
+     */
+    public void start(Memory mem) throws Exception {
+        this.memory = mem;
+        
+        // Initialize interpreter and mutexes
+        initializeInterpreter();
         
         System.out.println("========================================");
         System.out.println("Scheduler started with " + algorithm + " algorithm");

@@ -49,6 +49,13 @@ public class SimulationEngine {
         this.scheduler = new Scheduler();
         this.debugConsole = debugConsole;
         this.fileProgramQueue = new ArrayList<>();
+        
+        // Initialize interpreter with scheduler mutexes (required for semWait/semSignal)
+        try {
+            this.scheduler.initializeInterpreter();
+        } catch (Exception e) {
+            debugConsole.log("Failed to initialize interpreter: " + e.getMessage(), true);
+        }
     }
     
     /**
@@ -275,6 +282,14 @@ public class SimulationEngine {
     public void reset() {
         memory = new Memory();
         scheduler = new Scheduler();
+        
+        // Reinitialize interpreter with fresh scheduler mutexes
+        try {
+            scheduler.initializeInterpreter();
+        } catch (Exception e) {
+            debugConsole.log("Failed to reinitialize interpreter: " + e.getMessage(), true);
+        }
+        
         clockCycle = 0;
         instructionsExecuted = 0;
         nextArrivalIndex = 0;
