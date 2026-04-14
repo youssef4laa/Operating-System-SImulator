@@ -335,6 +335,10 @@ public class SimulationEngine {
         return running;
     }
     
+    public boolean isInitialized() {
+        return initialized;
+    }
+    
     public String getCurrentInstruction() {
         return currentInstruction;
     }

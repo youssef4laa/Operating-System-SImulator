@@ -106,17 +106,24 @@ public class ProgramDropZone extends JPanel implements DropTargetListener {
         orLabel.setForeground(new Color(150, 150, 150));
         orLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
         
-        JLabel browseLabel = new JLabel("Accepts .txt program files");
-        browseLabel.setFont(new Font("Arial", Font.ITALIC, 10));
-        browseLabel.setForeground(new Color(150, 150, 150));
-        browseLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+        JButton browseButton = new JButton("Browse Files (Single or Multiple)");
+        browseButton.setFont(new Font("Arial", Font.PLAIN, 11));
+        browseButton.setAlignmentX(Component.CENTER_ALIGNMENT);
+        browseButton.addActionListener(e -> browseAndAddFiles());
+        
+        JLabel hintLabel = new JLabel("Accepts .txt program files");
+        hintLabel.setFont(new Font("Arial", Font.ITALIC, 10));
+        hintLabel.setForeground(new Color(150, 150, 150));
+        hintLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
         
         emptyPanel.add(Box.createVerticalGlue());
         emptyPanel.add(dragLabel);
-        emptyPanel.add(Box.createVerticalStrut(5));
+        emptyPanel.add(Box.createVerticalStrut(8));
         emptyPanel.add(orLabel);
+        emptyPanel.add(Box.createVerticalStrut(8));
+        emptyPanel.add(browseButton);
         emptyPanel.add(Box.createVerticalStrut(5));
-        emptyPanel.add(browseLabel);
+        emptyPanel.add(hintLabel);
         emptyPanel.add(Box.createVerticalGlue());
         
         add(emptyPanel, BorderLayout.CENTER);
@@ -175,6 +182,22 @@ public class ProgramDropZone extends JPanel implements DropTargetListener {
             listPanel.add(programBox);
         }
         
+        // Add button to add more files
+        JPanel addFilePanel = new JPanel();
+        addFilePanel.setLayout(new FlowLayout(FlowLayout.LEFT, 0, 5));
+        addFilePanel.setOpaque(false);
+        addFilePanel.setMaximumSize(new Dimension(Integer.MAX_VALUE, 30));
+        
+        JButton addMoreBtn = new JButton("+ Add More Files");
+        addMoreBtn.setFont(new Font("Arial", Font.PLAIN, 10));
+        addMoreBtn.setMargin(new Insets(3, 8, 3, 8));
+        addMoreBtn.setFocusPainted(false);
+        addMoreBtn.addActionListener(e -> browseAndAddFiles());
+        
+        addFilePanel.add(addMoreBtn);
+        
+        listPanel.add(Box.createVerticalStrut(8));
+        listPanel.add(addFilePanel);
         listPanel.add(Box.createVerticalGlue());
         
         JScrollPane scroll = new JScrollPane(listPanel);
@@ -268,9 +291,9 @@ public class ProgramDropZone extends JPanel implements DropTargetListener {
             recalculateArrivalTimes();
             updateDisplay();
             
-            // Notify listener
-            if (!validFiles.isEmpty() && onDrop != null) {
-                onDrop.onProgramsDropped(validFiles, new ArrayList<>(arrivalTimes));
+            // Notify listener with ALL current files
+            if (!droppedFiles.isEmpty() && onDrop != null) {
+                onDrop.onProgramsDropped(new ArrayList<>(droppedFiles), new ArrayList<>(arrivalTimes));
             }
             
             dtde.dropComplete(true);
@@ -285,6 +308,51 @@ public class ProgramDropZone extends JPanel implements DropTargetListener {
      */
     private boolean isValidDrag(DropTargetDragEvent dtde) {
         return dtde.isDataFlavorSupported(DataFlavor.javaFileListFlavor);
+    }
+    
+    /**
+     * Open file chooser to browse and add program files (single or multiple)
+     */
+    private void browseAndAddFiles() {
+        JFileChooser fileChooser = new JFileChooser();
+        fileChooser.setFileSelectionMode(JFileChooser.FILES_ONLY);
+        fileChooser.setMultiSelectionEnabled(true);
+        fileChooser.setFileFilter(new javax.swing.filechooser.FileFilter() {
+            @Override
+            public boolean accept(File f) {
+                return f.isDirectory() || f.getName().endsWith(".txt");
+            }
+            
+            @Override
+            public String getDescription() {
+                return "Text Files (*.txt)";
+            }
+        });
+        
+        int result = fileChooser.showOpenDialog(null);
+        
+        if (result == JFileChooser.APPROVE_OPTION) {
+            File[] selectedFiles = fileChooser.getSelectedFiles();
+            List<File> validFiles = new ArrayList<>();
+            
+            for (File file : selectedFiles) {
+                if (file.isFile() && file.getName().endsWith(".txt")) {
+                    validFiles.add(file);
+                    droppedFiles.add(file);
+                }
+            }
+            
+            if (!validFiles.isEmpty()) {
+                // Recalculate arrival times
+                recalculateArrivalTimes();
+                updateDisplay();
+                
+                // Notify listener with new arrival times
+                if (onDrop != null) {
+                    onDrop.onProgramsDropped(validFiles, new ArrayList<>(arrivalTimes));
+                }
+            }
+        }
     }
     
     /**

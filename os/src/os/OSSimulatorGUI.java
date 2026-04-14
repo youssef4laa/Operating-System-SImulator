@@ -420,22 +420,12 @@ public class OSSimulatorGUI extends JFrame {
             // Reset simulation before loading new programs
             pauseExecution();
             engine.reset();
-            dropZone.clearPrograms();
             
             // Load programs into the engine
             engine.loadProgramsFromFiles(files, arrivalTimes);
             
             debugConsole.log("✓ Programs loaded successfully (" + files.size() + " file(s))");
             updateStatusLabel("Programs Loaded");
-            
-            // Show success message
-            JOptionPane.showMessageDialog(
-                this,
-                "Programs loaded successfully!\n\nFile(s): " + files.size() + 
-                "\nClick 'Initialize' to start the simulation.",
-                "Programs Loaded",
-                JOptionPane.INFORMATION_MESSAGE
-            );
             
         } catch (Exception e) {
             debugConsole.log("✗ Error loading programs: " + e.getMessage(), true);
