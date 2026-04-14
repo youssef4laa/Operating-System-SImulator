@@ -211,19 +211,19 @@ public class OSSimulatorGUI extends JFrame {
         JPanel leftPanel = createLeftPanel();
         mainSplit.setLeftComponent(leftPanel);
         
-        // Right: Middle + Right panels in another split
+        // Right: Timeline/Mutex/Stats + Debug Console in another split
         JSplitPane rightSplit = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT);
-        rightSplit.setResizeWeight(0.3);
+        rightSplit.setResizeWeight(0.7);
         
-        JPanel middlePanel = createMiddlePanel();
-        rightSplit.setLeftComponent(middlePanel);
+        JPanel centerPanel = createCenterPanel();
+        rightSplit.setLeftComponent(centerPanel);
         
-        JPanel rightPanel = createRightPanel();
-        rightSplit.setRightComponent(rightPanel);
+        JPanel debugPanel = createDebugPanel();
+        rightSplit.setRightComponent(debugPanel);
         
         mainSplit.setRightComponent(rightSplit);
         mainSplit.setDividerLocation(300);
-        rightSplit.setDividerLocation(350);
+        rightSplit.setDividerLocation(650);
         
         return mainSplit;
     }
@@ -277,28 +277,9 @@ public class OSSimulatorGUI extends JFrame {
     }
     
     /**
-     * Create middle panel with debug console
+     * Create center panel with process info, timeline, stats, and mutexes
      */
-    private JPanel createMiddlePanel() {
-        JPanel panel = new JPanel();
-        panel.setLayout(new BorderLayout(10, 10));
-        panel.setBorder(BorderFactory.createLineBorder(new Color(221, 221, 221), 1));
-        
-        // Add debug console
-        debugConsole.setPreferredSize(new Dimension(0, 350));
-        panel.add(debugConsole, BorderLayout.CENTER);
-        
-        // Control buttons
-        JPanel controlButtonsBox = createControlButtons();
-        panel.add(controlButtonsBox, BorderLayout.SOUTH);
-        
-        return panel;
-    }
-    
-    /**
-     * Create right panel with process info, stats, and timeline
-     */
-    private JPanel createRightPanel() {
+    private JPanel createCenterPanel() {
         JPanel panel = new JPanel();
         panel.setLayout(new BorderLayout());
         panel.setBorder(BorderFactory.createLineBorder(new Color(221, 221, 221), 1));
@@ -323,6 +304,25 @@ public class OSSimulatorGUI extends JFrame {
         tabPane.addTab("Statistics", statsPanel);
         
         panel.add(tabPane, BorderLayout.CENTER);
+        
+        return panel;
+    }
+    
+    /**
+     * Create debug panel with debug console
+     */
+    private JPanel createDebugPanel() {
+        JPanel panel = new JPanel();
+        panel.setLayout(new BorderLayout(10, 10));
+        panel.setBorder(BorderFactory.createLineBorder(new Color(221, 221, 221), 1));
+        
+        // Add debug console
+        debugConsole.setPreferredSize(new Dimension(0, 350));
+        panel.add(debugConsole, BorderLayout.CENTER);
+        
+        // Control buttons
+        JPanel controlButtonsBox = createControlButtons();
+        panel.add(controlButtonsBox, BorderLayout.SOUTH);
         
         return panel;
     }
