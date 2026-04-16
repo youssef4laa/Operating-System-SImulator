@@ -10,6 +10,18 @@ public class MemoryManager {
     
     // Track allocated memory blocks: processID -> (minBound, maxBound)
     private static Map<Integer, int[]> allocatedBlocks = new HashMap<>();
+    
+    // Disk folder for swapped processes
+    private static final String DISK_FOLDER = "disk";
+    
+    static {
+        // Initialize disk folder
+        File diskDir = new File(DISK_FOLDER);
+        if (!diskDir.exists()) {
+            diskDir.mkdir();
+            System.out.println("Created disk swap folder: " + DISK_FOLDER);
+        }
+    }
 
     /**
      * Validates that the required size is within reasonable bounds
@@ -29,11 +41,11 @@ public class MemoryManager {
     
     /**
      * Calculates the minimum memory needed for a process
-     * @return minimum words needed (code + variables + PCB metadata)
+     * @return minimum words needed (1 PCB + code + 3 variable words)
      */
     public static int calculateMinimumSize(int numInstructions) {
-        // At least 1 word for instructions + 3 for variables + 1 for PCB metadata
-        return Math.max(numInstructions, 1) + 3 + 1;
+        // Memory layout: 1 (PCB) + numInstructions + 3 (variables)
+        return 1 + Math.max(numInstructions, 1) + 3;
     }
     
     /**
@@ -163,7 +175,7 @@ public class MemoryManager {
     public static void swapOut(PCB pcb, Memory memory) throws Exception {
         System.out.println("Swapping OUT Process ID: " + pcb.processID);
         
-        String filename = "Disk_Process_" + pcb.processID + ".txt";
+        String filename = DISK_FOLDER + File.separator + "Disk_Process_" + pcb.processID + ".txt";
         PrintWriter pw = new PrintWriter(new FileWriter(filename));
         
         // Save PCB state
@@ -207,7 +219,7 @@ public class MemoryManager {
     public static void swapIn(PCB pcb, Memory memory, int newStart) throws Exception {
         System.out.println("Swapping IN Process ID: " + pcb.processID);
         
-        String filename = "Disk_Process_" + pcb.processID + ".txt";
+        String filename = DISK_FOLDER + File.separator + "Disk_Process_" + pcb.processID + ".txt";
         File file = new File(filename);
         if (!file.exists()) {
             throw new Exception("Swap file not found: " + filename);
@@ -272,5 +284,65 @@ public class MemoryManager {
         file.delete();
         System.out.println("Process " + pcb.processID + " swapped in at addresses " + 
                          newStart + "-" + (current - 1));
+    }
+    
+    /**
+     * Checks if memory pressure requires swapping, triggers swap if needed
+     * Swaps out process with longest remaining time until enough space is freed
+     * @return true if space is now available, false if swap was not possible
+     */
+    public static boolean checkAndTriggerSwap(Memory memory, int requiredSize) throws Exception {
+        int freeMemory = getFreeMemory(memory);
+        
+        if (freeMemory >= requiredSize) {
+            return true; // Enough space already available
+        }
+        
+        System.out.println("[SWAP TRIGGER] Memory pressure detected. Free: " + freeMemory + 
+                         " words, Required: " + requiredSize + " words");
+        
+        // Keep swapping until we have enough space
+        while (freeMemory < requiredSize) {
+            if (!swapOutProcessByLongestTime(memory)) {
+                System.out.println("[SWAP FAILED] No process available to swap out");
+                return false; // No process to swap
+            }
+            freeMemory = getFreeMemory(memory);
+            System.out.println("[SWAP COMPLETE] After swap: " + freeMemory + " words free");
+        }
+        
+        return true; // Space is now available
+    }
+    
+    /**
+     * Finds the process in memory with longest remaining time and swaps it out
+     * @return true if a process was swapped, false if no process to swap
+     */
+    public static boolean swapOutProcessByLongestTime(Memory memory) throws Exception {
+        PCB victimProcess = null;
+        int longestTime = -1;
+        
+        // Scan all memory to find all loaded PCBs
+        for (int i = 0; i < memory.getSize(); i++) {
+            Object obj = memory.read(i);
+            if (obj instanceof PCB) {
+                PCB pcb = (PCB) obj;
+                // Find process with longest remaining time (that's not already finished)
+                if (!pcb.status.equals("Finished") && pcb.remainingTime > longestTime) {
+                    victimProcess = pcb;
+                    longestTime = pcb.remainingTime;
+                }
+            }
+        }
+        
+        if (victimProcess == null) {
+            System.out.println("[SWAP] No eligible process to swap out");
+            return false;
+        }
+        
+        System.out.println("[SWAP] Selected Process " + victimProcess.processID + 
+                         " (remaining time: " + longestTime + " instructions) for swapout");
+        swapOut(victimProcess, memory);
+        return true;
     }
 }

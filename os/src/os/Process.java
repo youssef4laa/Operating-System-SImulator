@@ -25,24 +25,29 @@ public class Process {
             }
             br.close();
             
-            // Calculate required size: 1 (PCB) + instructionCount + 10 (variable slots)
+            // Calculate required size: 1 (PCB) + instructionCount + 3 (variable slots)
+            // Memory layout: [PCB | Instructions | Variables(3 words)]
             int instructionCount = instructions.size();
-            int requiredSize = 1 + instructionCount + 10;
+            int requiredSize = 1 + instructionCount + 3;
             
             // Validate size
             if (!MemoryManager.validateAllocationSize(requiredSize, memory)) {
                 throw new Exception("Invalid allocation size: " + requiredSize + " words exceeds memory capacity");
             }
             
+            // Check memory pressure and trigger swap if needed
+            if (!MemoryManager.checkAndTriggerSwap(memory, requiredSize)) {
+                throw new Exception("Memory swap failed: Cannot free space for process (" + 
+                                   requiredSize + " words required)");
+            }
+            
             int start = MemoryManager.findAvailableBlock(memory, requiredSize);
             
-            // If no space available, trigger swap (in a real OS, this would be more sophisticated)
+            // If no space available even after swap, fail
             if (start == -1) {
-                System.out.println("[MEMORY WARNING] Insufficient space for new process. Free: " + 
+                System.out.println("[MEMORY ERROR] Insufficient space for new process. Free: " + 
                                  MemoryManager.getFreeMemory(memory) + " words, Required: " + requiredSize);
-                // Note: Actual swap triggering would happen in the Scheduler
-                // For now, we throw an exception
-                throw new Exception("No contiguous space (" + requiredSize + " words) available in memory. Swap needed.");
+                throw new Exception("No contiguous space (" + requiredSize + " words) available in memory. Swap failed.");
             }
             
             int current = start;
@@ -64,8 +69,8 @@ public class Process {
             
             // Initialize variable slots in memory (empty/null)
             // Variables will be accessed via symbol table (name -> memory index)
-            // Reserve 10 slots for variables after instructions
-            for (int i = 0; i < 10; i++) {
+            // Reserve exactly 3 slots for variables after instructions
+            for (int i = 0; i < 3; i++) {
                 memory.write(current++, null); // Initially empty
             }
             

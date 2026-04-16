@@ -129,6 +129,7 @@ public class Interpreter {
 
     /**
      * Instruction: assign variable value
+     * Supports: literals, variables, input system call, and readFile system call
      * Stores variable in process memory via symbol table
      */
     private static void handleAssign(Parser.Instruction inst, PCB pcb, Memory memory) throws Exception {
@@ -138,36 +139,50 @@ public class Interpreter {
         
         Object value;
         
-        // Check if value is special keyword "input"
+        // Check if value is a system call that returns a value
+        // Pattern 1: "input" - reads user input
         if (valueStr.equalsIgnoreCase("input")) {
-            // Suppress logging on retries
-            if (mutexUserInput != null) {
-                mutexUserInput.setSuppressLogging(pcb.isRetryingInstruction);
-            }
-            
-            // Acquire user input mutex
-            if (mutexUserInput != null) {
-                mutexUserInput.acquire(pcb, scheduler);
-                if (pcb.status.equals("Blocked")) return; // Blocked waiting for resource
-            }
-            
             // Set process ID context for input dialog
             SystemCall.setCurrentProcessId("P_" + pcb.processID);
             // Suppress logging on retry of this instruction
             value = SystemCall.input(pcb.isRetryingInstruction);
             SystemCall.clearCurrentProcessId();
             
-            if (mutexUserInput != null) {
-                mutexUserInput.release(scheduler);
-                // Reset logging flag
-                mutexUserInput.setSuppressLogging(false);
+            if (value == null) {
+                throw new Exception("Failed to read input");
             }
-        } else if (Parser.isNumber(valueStr)) {
-            // Numeric value
+        }
+        // Pattern 2: "readFile filename" - reads file contents
+        else if (valueStr.toLowerCase().startsWith("readfile")) {
+            String[] parts = valueStr.split("\\s+", 2);
+            if (parts.length < 2) {
+                throw new Exception("readFile requires a filename argument");
+            }
+            
+            String filenameArg = parts[1];
+            // Resolve filename: could be a variable or literal
+            String filename = resolveStringValue(filenameArg, pcb, memory);
+            
+            // Call readFile system call
+            value = SystemCall.readFile(filename);
+            
+            if (value == null) {
+                throw new Exception("Failed to read file: " + filename);
+            }
+        }
+        // Pattern 3: numeric literal
+        else if (Parser.isNumber(valueStr)) {
             value = Integer.parseInt(valueStr);
-        } else {
-            // String value
-            value = valueStr;
+        }
+        // Pattern 4: variable reference or string literal
+        else {
+            // Try to retrieve as variable first
+            Object varValue = retrieveVariable(valueStr, pcb, memory);
+            if (varValue != null) {
+                value = varValue;  // Use variable value
+            } else {
+                value = valueStr;  // Use as string literal
+            }
         }
         
         // Store variable in process memory
@@ -176,7 +191,7 @@ public class Interpreter {
 
     /**
      * Instruction: print variable value to console
-     * Requires userOutput mutex
+     * No longer protected by mutex - use semWait/semSignal for serialization
      */
     private static void handlePrint(Parser.Instruction inst, PCB pcb, Memory memory) throws Exception {
         String varName = inst.args.get(0);
@@ -188,24 +203,13 @@ public class Interpreter {
             throw new Exception("Variable not defined: " + varName);
         }
         
-        // Acquire user output mutex
-        if (mutexUserOutput != null) {
-            mutexUserOutput.acquire(pcb, scheduler);
-            if (pcb.status.equals("Blocked")) return; // Blocked waiting for resource
-        }
-        
-        // Execute system call
+        // Execute system call directly (no mutex protection)
         SystemCall.print(value.toString());
-        
-        // Release user output mutex
-        if (mutexUserOutput != null) {
-            mutexUserOutput.release(scheduler);
-        }
     }
 
     /**
      * Instruction: print range of numbers from start to end
-     * Requires userOutput mutex
+     * No longer protected by mutex - use semWait/semSignal for serialization
      */
     private static void handlePrintFromTo(Parser.Instruction inst, PCB pcb, Memory memory) throws Exception {
         String startStr = inst.args.get(0);
@@ -215,47 +219,25 @@ public class Interpreter {
         int start = parseValue(startStr, pcb, memory);
         int end = parseValue(endStr, pcb, memory);
         
-        // Acquire user output mutex
-        if (mutexUserOutput != null) {
-            mutexUserOutput.acquire(pcb, scheduler);
-            if (pcb.status.equals("Blocked")) return; // Blocked waiting for resource
-        }
-        
-        // Print range
+        // Print range directly (no mutex protection)
         StringBuilder output = new StringBuilder();
         for (int i = start; i <= end; i++) {
             output.append(i);
             if (i < end) output.append(" ");
         }
         SystemCall.print(output.toString());
-        
-        // Release user output mutex
-        if (mutexUserOutput != null) {
-            mutexUserOutput.release(scheduler);
-        }
     }
 
     /**
      * Instruction: read file contents into variable
-     * Requires file mutex
+     * No longer protected by mutex - use semWait/semSignal for serialization
      */
     private static void handleReadFile(Parser.Instruction inst, PCB pcb, Memory memory) throws Exception {
         String filename = inst.args.get(0);
         String storeVar = inst.args.size() > 1 ? inst.args.get(1) : "fileData";
         
-        // Acquire file mutex
-        if (mutexFile != null) {
-            mutexFile.acquire(pcb, scheduler);
-            if (pcb.status.equals("Blocked")) return; // Blocked waiting for resource
-        }
-        
-        // Execute system call
+        // Execute system call directly (no mutex protection)
         String fileContents = SystemCall.readFile(filename);
-        
-        // Release file mutex
-        if (mutexFile != null) {
-            mutexFile.release(scheduler);
-        }
         
         if (fileContents == null) {
             throw new Exception("Failed to read file: " + filename);
@@ -267,7 +249,7 @@ public class Interpreter {
 
     /**
      * Instruction: write data to file
-     * Requires file mutex
+     * No longer protected by mutex - use semWait/semSignal for serialization
      */
     private static void handleWriteFile(Parser.Instruction inst, PCB pcb, Memory memory) throws Exception {
         String filename = inst.args.get(0);
@@ -279,19 +261,8 @@ public class Interpreter {
             dataValue = dataStr; // Use literal string if not a variable
         }
         
-        // Acquire file mutex
-        if (mutexFile != null) {
-            mutexFile.acquire(pcb, scheduler);
-            if (pcb.status.equals("Blocked")) return; // Blocked waiting for resource
-        }
-        
-        // Execute system call
+        // Execute system call directly (no mutex protection)
         int result = SystemCall.writeFile(filename, dataValue.toString());
-        
-        // Release file mutex
-        if (mutexFile != null) {
-            mutexFile.release(scheduler);
-        }
         
         if (result != SystemCall.SUCCESS) {
             throw new Exception("Failed to write to file: " + filename);
@@ -342,9 +313,12 @@ public class Interpreter {
             }
         } else {
             // Allocate new variable in process memory
-            // Find first empty slot after instructions
+            // Variables must go in the reserved variable region: last 3 words
+            // Variable region: [maxBound-2, maxBound-1, maxBound]
+            int varRegionStart = pcb.maxBound - 2;
             int allocAddr = -1;
-            for (int i = pcb.minBound; i <= pcb.maxBound; i++) {
+            
+            for (int i = varRegionStart; i <= pcb.maxBound; i++) {
                 Object current = memory.read(i);
                 if (current == null || (current instanceof String && ((String)current).isEmpty())) {
                     allocAddr = i;
@@ -353,7 +327,7 @@ public class Interpreter {
             }
             
             if (allocAddr == -1) {
-                throw new Exception("Process " + pcb.processID + " ran out of variable space");
+                throw new Exception("Process " + pcb.processID + " has exhausted variable space (3 words max)");
             }
             
             // Store variable
@@ -376,6 +350,18 @@ public class Interpreter {
         }
         
         return null;
+    }
+
+    /**
+     * Helper: Resolve a string value that could be a variable or literal
+     */
+    private static String resolveStringValue(String value, PCB pcb, Memory memory) throws Exception {
+        // Try to retrieve as variable first
+        Object varValue = retrieveVariable(value, pcb, memory);
+        if (varValue != null) {
+            return varValue.toString();  // Return variable value
+        }
+        return value;  // Return as literal string
     }
 
     /**

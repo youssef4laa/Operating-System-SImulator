@@ -20,8 +20,8 @@ public class PCB {
 	    public int totalInstructions;
 	    
 	    // Memory management
-	    public static final int MAX_VARIABLES_PER_PROCESS = 10;  // Increased to match dynamic allocation
-	    public int variableCount; // Track number of variables (max 10)
+	    public static final int MAX_VARIABLES_PER_PROCESS = 3;  // Exactly 3 variable slots per process
+	    public int variableCount; // Track number of variables (max 3)
 	    public int allocationSize; // Total memory words allocated to this process
 	    
 	    // For MLFQ scheduling

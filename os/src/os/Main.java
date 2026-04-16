@@ -40,6 +40,11 @@ public class Main {
             Scheduler scheduler = new Scheduler();
             System.out.println("[Main] Initializing scheduler");
             
+            // Register system trace logger for detailed logging
+            SystemTraceLogger traceLogger = new SystemTraceLogger(true);  // true = enabled
+            scheduler.addObserver(traceLogger);
+            System.out.println("[Main] System trace logger registered");
+            
             // Set scheduling algorithm
             // Options: "RR" (Round Robin), "HRRN" (Highest Response Ratio Next), "MLFQ" (Multi-Level Feedback Queue)
             scheduler.algorithm = "RR";

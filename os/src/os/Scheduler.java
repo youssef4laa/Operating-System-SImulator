@@ -11,6 +11,7 @@ public class Scheduler {
     LinkedList<PCB> readyQueue = new LinkedList<>();
     LinkedList<PCB> blockedQueue = new LinkedList<>();
     LinkedList<PCB> finishedQueue = new LinkedList<>();
+    LinkedList<PCB> swappedQueue = new LinkedList<>();  // Track processes swapped to disk
     
     // MLFQ queues
     LinkedList<PCB> q0 = new LinkedList<>();
@@ -32,6 +33,9 @@ public class Scheduler {
     
     // Process scheduling state
     private boolean processesArrived = false;
+    
+    // Observer pattern for logging
+    private List<SchedulerObserver> observers = new ArrayList<>();
 
     /**
      * Initialize the Interpreter with mutex manager and scheduler
@@ -50,6 +54,62 @@ public class Scheduler {
     }
 
     /**
+     * Observer Pattern: Register an observer
+     */
+    public void addObserver(SchedulerObserver observer) {
+        if (observer != null) {
+            observers.add(observer);
+        }
+    }
+
+    /**
+     * Observer Pattern: Unregister an observer
+     */
+    public void removeObserver(SchedulerObserver observer) {
+        observers.remove(observer);
+    }
+
+    /**
+     * Observer Pattern: Notify all observers of a scheduling event
+     */
+    private void notifySchedulingEvent(SchedulingEvent event) {
+        event.readyQueueSize = readyQueue.size();
+        event.blockedQueueSize = blockedQueue.size();
+        event.finishedQueueSize = finishedQueue.size();
+        
+        for (SchedulerObserver observer : observers) {
+            observer.onSchedulingEvent(event);
+        }
+    }
+
+    /**
+     * Observer Pattern: Notify all observers of a clock cycle (for memory/state snapshots)
+     */
+    private void notifyClockCycle(int clockCycle) {
+        for (SchedulerObserver observer : observers) {
+            observer.onClockCycle(clockCycle, memory, this);
+        }
+    }
+
+    /**
+     * Observer Pattern: Notify all observers of simulation start
+     */
+    private void notifySimulationStart() {
+        for (SchedulerObserver observer : observers) {
+            observer.onSimulationStart();
+        }
+    }
+
+    /**
+     * Observer Pattern: Notify all observers of simulation end
+     */
+    private void notifySimulationEnd() {
+        for (SchedulerObserver observer : observers) {
+            observer.onSimulationEnd();
+        }
+    }
+
+    /**
      * Initializes scheduler and starts the main scheduling loop
      */
     public void start(Memory mem) throws Exception {
@@ -57,6 +117,9 @@ public class Scheduler {
         
         // Initialize interpreter and mutexes
         initializeInterpreter();
+        
+        // Notify observers of simulation start
+        notifySimulationStart();
         
         System.out.println("========================================");
         System.out.println("Scheduler started with " + algorithm + " algorithm");
@@ -81,6 +144,9 @@ public class Scheduler {
                 System.out.println("All processes completed");
                 mutexManager.printStatistics();
                 System.out.println("========================================\n");
+                
+                // Notify observers of simulation end
+                notifySimulationEnd();
                 break;
             }
 
@@ -94,6 +160,12 @@ public class Scheduler {
                 case "RR":
                     current = readyQueue.poll();
                     if (current != null) {
+                        // Notify of process selection
+                        SchedulingEvent event = new SchedulingEvent(
+                            SchedulingEvent.EventType.PROCESS_SELECTED, time, current);
+                        event.eventDetails = "Selected from ready queue";
+                        notifySchedulingEvent(event);
+                        
                         RR(current, memory);
                     }
                     break;
@@ -101,6 +173,12 @@ public class Scheduler {
                 case "HRRN":
                     current = HRRN();
                     if (current != null) {
+                        // Notify of process selection
+                        SchedulingEvent event = new SchedulingEvent(
+                            SchedulingEvent.EventType.PROCESS_SELECTED, time, current);
+                        event.eventDetails = "Selected via HRRN";
+                        notifySchedulingEvent(event);
+                        
                         FCFS(current, memory);
                     }
                     break;
@@ -108,6 +186,12 @@ public class Scheduler {
                 case "MLFQ":
                     current = MLFQ();
                     if (current != null) {
+                        // Notify of process selection
+                        SchedulingEvent event = new SchedulingEvent(
+                            SchedulingEvent.EventType.PROCESS_SELECTED, time, current);
+                        event.eventDetails = "Selected via MLFQ";
+                        notifySchedulingEvent(event);
+                        
                         runMLFQ(current, memory);
                     }
                     break;
@@ -120,11 +204,22 @@ public class Scheduler {
                 if (p.status.equals("Finished")) {
                     iter.remove();
                     finishedQueue.add(p);
+                    
+                    // Notify of process finish
+                    SchedulingEvent event = new SchedulingEvent(
+                        SchedulingEvent.EventType.PROCESS_FINISHED, time, p);
+                    event.eventDetails = "Process completed";
+                    notifySchedulingEvent(event);
+                    
                     Process.terminateProcess(p, memory);
                 }
             }
 
             memory.displayMemory();
+            
+            // Notify of clock cycle completion
+            notifyClockCycle(time);
+            
             time++;
             iteration++;
         }
@@ -252,6 +347,12 @@ public class Scheduler {
             finishedQueue.add(pcb);
         } else if (pcb.status.equals("Blocked")) {
             blockedQueue.add(pcb);
+            
+            // Notify observers of blocking event
+            SchedulingEvent event = new SchedulingEvent(
+                SchedulingEvent.EventType.PROCESS_BLOCKED, time, pcb);
+            event.eventDetails = "Process blocked on resource";
+            notifySchedulingEvent(event);
         } else if (pcb.status.equals("Running")) {
             pcb.status = "Ready";
             readyQueue.add(pcb);
