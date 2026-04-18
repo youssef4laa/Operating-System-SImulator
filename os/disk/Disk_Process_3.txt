@@ -1,0 +1,31 @@
+3
+Ready
+23
+0
+9
+0
+13
+9
+semWait userInput
+assign a input
+semSignal userInput
+semWait file
+assign b readFile a
+semSignal file
+semWait userOutput
+print b
+semSignal userOutput
+0
+os.PCB@57e2f016
+semWait userInput
+assign a input
+semSignal userInput
+semWait file
+assign b readFile a
+semSignal file
+semWait userOutput
+print b
+semSignal userOutput
+null
+null
+null
