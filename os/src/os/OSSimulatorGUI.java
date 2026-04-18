@@ -466,6 +466,10 @@ public class OSSimulatorGUI extends JFrame {
      * Start execution
      */
     private void startExecution() {
+        if (!engine.isInitialized()) {
+            initializeSimulation();
+            if (!engine.isInitialized()) return; // User might have cancelled or no programs loaded
+        }
         if (!engine.isRunning()) {
             engine.start();
         }
@@ -480,6 +484,10 @@ public class OSSimulatorGUI extends JFrame {
      * Execute one step
      */
     private void executeOneStep() {
+        if (!engine.isInitialized()) {
+            initializeSimulation();
+            if (!engine.isInitialized()) return;
+        }
         engine.step();
     }
 

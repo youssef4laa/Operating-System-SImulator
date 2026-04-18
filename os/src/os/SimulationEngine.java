@@ -136,7 +136,7 @@ public class SimulationEngine {
      */
     public void start() {
         if (!initialized) {
-            initialize("RR");
+            initialize(scheduler.algorithm != null ? scheduler.algorithm : "RR");
         }
         running = true;
         debugConsole.log("\nSimulation started");
@@ -152,7 +152,7 @@ public class SimulationEngine {
                 debugConsole.log("No programs loaded. Please drag and drop program files first.", true);
                 return;
             }
-            initialize("RR");
+            initialize(scheduler.algorithm != null ? scheduler.algorithm : "RR");
         }
         
         if (!running) {
@@ -208,6 +208,8 @@ public class SimulationEngine {
         try {
             if ("RR".equalsIgnoreCase(scheduler.algorithm)) {
                 executeRRQuantumStep();
+            } else if ("HRRN".equalsIgnoreCase(scheduler.algorithm)) {
+                executeHRRNStep();
             } else {
                 executeSingleInstructionStep();
             }
@@ -324,6 +326,128 @@ public class SimulationEngine {
             scheduler.emitSchedulingEvent(quantumEvent);
             debugConsole.log("  -> RR quantum expired for P" + nextPCB.processID + " (2/2)");
         }
+    }
+
+    private PCB currentRunningPCB = null;
+
+    /**
+     * GUI step mode for HRRN: execution is non-preemptive.
+     * Once a process is selected, it runs until finished or blocked.
+     */
+    private void executeHRRNStep() {
+        PCB nextPCB = null;
+        
+        // If HRRN is already running a process, keep running it
+        if (currentRunningPCB != null && "Running".equals(currentRunningPCB.status)) {
+            nextPCB = currentRunningPCB;
+        } else {
+            // Select best process via HRRN
+            nextPCB = scheduler.selectNextProcess(); // will call selectHRRN
+            
+            if (nextPCB != null) {
+                // Actually remove it from the ready queue since HRRN is non-preemptive
+                scheduler.readyQueue.remove(nextPCB);
+                nextPCB.status = "Running";
+                currentRunningPCB = nextPCB;
+                
+                SchedulingEvent selectedEvent = new SchedulingEvent(
+                    SchedulingEvent.EventType.PROCESS_SELECTED,
+                    clockCycle,
+                    nextPCB
+                );
+                selectedEvent.eventDetails = "Selected via HRRN (Non-preemptive)";
+                scheduler.emitSchedulingEvent(selectedEvent);
+            }
+        }
+
+        if (nextPCB == null) {
+            return;
+        }
+
+        if (nextPCB.instructionPointer >= nextPCB.instructionList.size()) {
+            nextPCB.status = "Finished";
+            currentRunningPCB = null;
+            try {
+                Process.terminateProcess(nextPCB, memory, scheduler);
+            } catch (Exception e) {
+                debugConsole.log("Cleanup failed for finished process: " + e.getMessage(), true);
+            }
+            if (!scheduler.finishedQueue.contains(nextPCB)) {
+                scheduler.finishedQueue.add(nextPCB);
+            }
+
+            SchedulingEvent finishedEvent = new SchedulingEvent(
+                SchedulingEvent.EventType.PROCESS_FINISHED,
+                clockCycle,
+                nextPCB
+            );
+            finishedEvent.eventDetails = "Process completed";
+            scheduler.emitSchedulingEvent(finishedEvent);
+            return;
+        }
+
+        String instructionString = nextPCB.instructionList.get(nextPCB.instructionPointer);
+        currentInstruction = instructionString;
+        debugConsole.log("[Clock " + clockCycle + "] Process P" + nextPCB.processID +
+                       " executing, PC: " + nextPCB.programCounter);
+        debugConsole.log("  Instruction: " + instructionString);
+
+        Interpreter.execute(nextPCB, memory);
+        instructionsExecuted++;
+
+        if ("Terminated".equals(nextPCB.status)) {
+            debugConsole.log("  -> Process P" + nextPCB.processID + " TERMINATED (fatal error)");
+            currentRunningPCB = null;
+            scheduler.readyQueue.remove(nextPCB);
+            scheduler.blockedQueue.remove(nextPCB);
+            try {
+                Process.terminateProcess(nextPCB, memory, scheduler);
+            } catch (Exception e) {
+                debugConsole.log("Cleanup failed for terminated process: " + e.getMessage(), true);
+            }
+            if (!scheduler.finishedQueue.contains(nextPCB)) {
+                scheduler.finishedQueue.add(nextPCB);
+            }
+
+            SchedulingEvent finishedEvent = new SchedulingEvent(
+                SchedulingEvent.EventType.PROCESS_FINISHED,
+                clockCycle,
+                nextPCB
+            );
+            finishedEvent.eventDetails = "Process terminated due to fatal error";
+            scheduler.emitSchedulingEvent(finishedEvent);
+            return;
+        }
+
+        if ("Blocked".equals(nextPCB.status)) {
+            debugConsole.log("  -> Process P" + nextPCB.processID + " blocked on resource");
+            currentRunningPCB = null; // No longer running
+            // the mutex already added it to blockedQueue
+            return;
+        }
+
+        if (nextPCB.instructionPointer >= nextPCB.instructionList.size()) {
+            nextPCB.status = "Finished";
+            currentRunningPCB = null;
+            debugConsole.log("  -> Process P" + nextPCB.processID + " completed");
+            try {
+                Process.terminateProcess(nextPCB, memory, scheduler);
+            } catch (Exception e) {
+                debugConsole.log("Cleanup failed for finished process: " + e.getMessage(), true);
+            }
+            if (!scheduler.finishedQueue.contains(nextPCB)) {
+                scheduler.finishedQueue.add(nextPCB);
+            }
+
+            SchedulingEvent finishedEvent = new SchedulingEvent(
+                SchedulingEvent.EventType.PROCESS_FINISHED,
+                clockCycle,
+                nextPCB
+            );
+            finishedEvent.eventDetails = "Process completed";
+            scheduler.emitSchedulingEvent(finishedEvent);
+        }
+        // Note: We DO NOT set status back to "Ready". It stays "Running" since it's non-preemptive.
     }
 
     /**
