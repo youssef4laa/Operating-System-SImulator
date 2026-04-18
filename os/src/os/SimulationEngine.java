@@ -479,6 +479,8 @@ public class SimulationEngine {
     public void reset() {
         memory = new Memory();
         scheduler = new Scheduler();
+        MemoryManager.resetState();
+        Process.resetIdCounter();
         
         // Reinitialize interpreter with fresh scheduler mutexes
         try {

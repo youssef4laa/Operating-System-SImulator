@@ -24,6 +24,13 @@ public class MemoryManager {
     }
 
     /**
+     * Reset static memory-management state between simulation runs.
+     */
+    public static void resetState() {
+        allocatedBlocks.clear();
+    }
+
+    /**
      * Validates that the required size is within reasonable bounds
      * @return true if size is valid
      */

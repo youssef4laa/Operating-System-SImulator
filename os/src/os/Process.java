@@ -9,6 +9,13 @@ public class Process {
     static int nextID = 1; 
 
     /**
+     * Reset process ID sequence for a fresh simulation run.
+     */
+    public static void resetIdCounter() {
+        nextID = 1;
+    }
+
+    /**
      * Creates a process by reading the program file and allocating memory.
      * Dynamically allocates space for: PCB + instructions + 10 variable slots
      * Implements swap logic if memory is insufficient
