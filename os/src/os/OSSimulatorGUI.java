@@ -53,8 +53,8 @@ public class OSSimulatorGUI extends JFrame {
         // Initialize simulation engine
         engine = new SimulationEngine(debugConsole);
         
-        // Enable GUI-based input popups for mutex operations
-        SystemCall.setInputProvider(new GUIInputProvider());
+        // Enable GUI-based input popups and reset simulation if input is cancelled
+        SystemCall.setInputProvider(new GUIInputProvider(this::handleInputCancellation));
         
         // Setup listener for GUI updates
         engine.setListener(new SimulationEngine.SimulationListener() {
@@ -481,6 +481,13 @@ public class OSSimulatorGUI extends JFrame {
      */
     private void executeOneStep() {
         engine.step();
+    }
+
+    /**
+     * Handle user cancellation of input dialogs by resetting simulation state.
+     */
+    private void handleInputCancellation() {
+        resetSimulation(false);
     }
     
     /**

@@ -36,6 +36,9 @@ public class SystemCall {
     
     // Current process ID for input context
     private static String currentProcessId = null;
+
+    // True when the last input() returned null due to explicit user cancellation in GUI mode
+    private static boolean inputCancelledByUser = false;
     
     // Return codes
     public static final int SUCCESS = 0;
@@ -97,6 +100,7 @@ public class SystemCall {
     public static String input(boolean suppressLogging) {
         try {
             String inputValue;
+            inputCancelledByUser = false;
             
             // Use GUI input provider if available, otherwise fallback to console Scanner
             if (inputProvider != null) {
@@ -111,9 +115,7 @@ public class SystemCall {
             }
             
             if (inputValue == null) {
-                if (!suppressLogging) {
-                    logError("input: cancelled/null input");
-                }
+                inputCancelledByUser = true;
                 stats.recordCall("input", INPUT_ERROR);
                 return null;
             }
@@ -445,6 +447,15 @@ public class SystemCall {
      */
     public static void clearCurrentProcessId() {
         currentProcessId = null;
+    }
+
+    /**
+     * Consume and clear the user-cancel flag set by input().
+     */
+    public static boolean consumeInputCancelledFlag() {
+        boolean wasCancelled = inputCancelledByUser;
+        inputCancelledByUser = false;
+        return wasCancelled;
     }
 
     /**

@@ -200,6 +200,11 @@ public class Interpreter {
             SystemCall.clearCurrentProcessId();
             
             if (value == null) {
+                if (SystemCall.consumeInputCancelledFlag()) {
+                    // User cancelled GUI input and triggered simulation reset.
+                    pcb.status = "Finished";
+                    return;
+                }
                 throw new Exception("Failed to read input");
             }
         }

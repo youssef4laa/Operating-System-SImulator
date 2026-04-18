@@ -8,6 +8,16 @@ import javax.swing.*;
  * Thread-safe: uses SwingUtilities to ensure dialog is shown on EDT
  */
 public class GUIInputProvider implements InputProvider {
+
+    private final Runnable onInputCancelled;
+
+    public GUIInputProvider() {
+        this(null);
+    }
+
+    public GUIInputProvider(Runnable onInputCancelled) {
+        this.onInputCancelled = onInputCancelled;
+    }
     
     /**
      * Show a modal input dialog for user interaction
@@ -69,6 +79,19 @@ public class GUIInputProvider implements InputProvider {
             title,
             JOptionPane.QUESTION_MESSAGE
         );
+
+        if (input == null) {
+            JOptionPane.showMessageDialog(
+                null,
+                "Input was cancelled. The simulation will now reset.",
+                "Input Cancelled",
+                JOptionPane.WARNING_MESSAGE
+            );
+
+            if (onInputCancelled != null) {
+                onInputCancelled.run();
+            }
+        }
         
         return input; // null if cancelled, otherwise the string entered
     }
