@@ -260,8 +260,16 @@ public class SimulationEngine {
 
             if ("Terminated".equals(nextPCB.status)) {
                 debugConsole.log("  -> Process P" + nextPCB.processID + " TERMINATED (fatal error)");
+                scheduler.readyQueue.remove(nextPCB);
                 scheduler.blockedQueue.remove(nextPCB);
-                scheduler.finishedQueue.add(nextPCB);
+                try {
+                    Process.terminateProcess(nextPCB, memory, scheduler);
+                } catch (Exception e) {
+                    debugConsole.log("Cleanup failed for terminated process: " + e.getMessage(), true);
+                }
+                if (!scheduler.finishedQueue.contains(nextPCB)) {
+                    scheduler.finishedQueue.add(nextPCB);
+                }
 
                 SchedulingEvent finishedEvent = new SchedulingEvent(
                     SchedulingEvent.EventType.PROCESS_FINISHED,
@@ -281,7 +289,16 @@ public class SimulationEngine {
             if (nextPCB.instructionPointer >= nextPCB.instructionList.size()) {
                 nextPCB.status = "Finished";
                 debugConsole.log("  -> Process P" + nextPCB.processID + " completed");
-                scheduler.finishedQueue.add(nextPCB);
+                scheduler.readyQueue.remove(nextPCB);
+                scheduler.blockedQueue.remove(nextPCB);
+                try {
+                    Process.terminateProcess(nextPCB, memory, scheduler);
+                } catch (Exception e) {
+                    debugConsole.log("Cleanup failed for finished process: " + e.getMessage(), true);
+                }
+                if (!scheduler.finishedQueue.contains(nextPCB)) {
+                    scheduler.finishedQueue.add(nextPCB);
+                }
 
                 SchedulingEvent finishedEvent = new SchedulingEvent(
                     SchedulingEvent.EventType.PROCESS_FINISHED,
@@ -335,7 +352,14 @@ public class SimulationEngine {
         if (nextPCB.instructionPointer >= nextPCB.instructionList.size()) {
             nextPCB.status = "Finished";
             scheduler.readyQueue.remove(nextPCB);
-            scheduler.finishedQueue.add(nextPCB);
+            try {
+                Process.terminateProcess(nextPCB, memory, scheduler);
+            } catch (Exception e) {
+                debugConsole.log("Cleanup failed for finished process: " + e.getMessage(), true);
+            }
+            if (!scheduler.finishedQueue.contains(nextPCB)) {
+                scheduler.finishedQueue.add(nextPCB);
+            }
 
             SchedulingEvent finishedEvent = new SchedulingEvent(
                 SchedulingEvent.EventType.PROCESS_FINISHED,
@@ -360,7 +384,14 @@ public class SimulationEngine {
             debugConsole.log("  -> Process P" + nextPCB.processID + " TERMINATED (fatal error)");
             scheduler.readyQueue.remove(nextPCB);
             scheduler.blockedQueue.remove(nextPCB);
-            scheduler.finishedQueue.add(nextPCB);
+            try {
+                Process.terminateProcess(nextPCB, memory, scheduler);
+            } catch (Exception e) {
+                debugConsole.log("Cleanup failed for terminated process: " + e.getMessage(), true);
+            }
+            if (!scheduler.finishedQueue.contains(nextPCB)) {
+                scheduler.finishedQueue.add(nextPCB);
+            }
 
             SchedulingEvent finishedEvent = new SchedulingEvent(
                 SchedulingEvent.EventType.PROCESS_FINISHED,
@@ -381,7 +412,14 @@ public class SimulationEngine {
             nextPCB.status = "Finished";
             debugConsole.log("  -> Process P" + nextPCB.processID + " completed");
             scheduler.readyQueue.remove(nextPCB);
-            scheduler.finishedQueue.add(nextPCB);
+            try {
+                Process.terminateProcess(nextPCB, memory, scheduler);
+            } catch (Exception e) {
+                debugConsole.log("Cleanup failed for finished process: " + e.getMessage(), true);
+            }
+            if (!scheduler.finishedQueue.contains(nextPCB)) {
+                scheduler.finishedQueue.add(nextPCB);
+            }
 
             SchedulingEvent finishedEvent = new SchedulingEvent(
                 SchedulingEvent.EventType.PROCESS_FINISHED,

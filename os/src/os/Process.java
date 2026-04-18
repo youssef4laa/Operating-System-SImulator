@@ -100,9 +100,17 @@ public class Process {
      * Terminates a process and deallocates its memory.
      */
     public static void terminateProcess(PCB pcb, Memory memory) throws Exception {
+        terminateProcess(pcb, memory, null);
+    }
+
+    /**
+     * Terminates a process, releases owned mutexes, and deallocates memory.
+     */
+    public static void terminateProcess(PCB pcb, Memory memory, Scheduler scheduler) throws Exception {
         if (pcb == null) return;
         
         try {
+            cleanupOwnedMutexes(pcb, scheduler);
             MemoryManager.deallocateBlock(pcb.minBound, pcb.maxBound, memory);
             MemoryManager.untrackAllocation(pcb.processID);
             pcb.status = "Finished";
@@ -112,6 +120,29 @@ public class Process {
             throw e;
         }
     }
+
+	/**
+	 * Releases all mutexes currently owned by a process.
+	 */
+	public static void cleanupOwnedMutexes(PCB pcb, Scheduler scheduler) {
+		if (pcb == null || pcb.ownedMutexes == null || pcb.ownedMutexes.isEmpty()) {
+			return;
+		}
+
+		List<Mutex> ownedCopy = new ArrayList<>(pcb.ownedMutexes);
+		for (Mutex mutex : ownedCopy) {
+			try {
+				if (scheduler != null) {
+					mutex.release(scheduler, pcb);
+				}
+			} catch (Exception e) {
+				System.err.println("[CLEANUP ERROR] Failed to release mutex '" +
+					mutex.getResourceName() + "' for process " + pcb.processID + ": " + e.getMessage());
+			}
+		}
+
+		pcb.ownedMutexes.clear();
+	}
 	
     /**
      * Finds contiguous free memory block of given size.

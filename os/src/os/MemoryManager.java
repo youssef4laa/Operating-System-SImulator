@@ -73,12 +73,30 @@ public class MemoryManager {
      * @return Starting address of free block, or -1 if not found
      */
     public static int findAvailableBlock(Memory memory, int requiredSize) throws Exception {
+        boolean[] occupied = new boolean[memory.getSize()];
+
+        // Treat every tracked process range as occupied, even if some words are null.
+        for (int[] bounds : allocatedBlocks.values()) {
+            int startBound = Math.max(0, bounds[0]);
+            int endBound = Math.min(memory.getSize() - 1, bounds[1]);
+            for (int i = startBound; i <= endBound; i++) {
+                occupied[i] = true;
+            }
+        }
+
+        // Defensive fallback: if any non-null word exists outside tracked ranges, treat it as occupied.
+        for (int i = 0; i < memory.getSize(); i++) {
+            if (memory.read(i) != null) {
+                occupied[i] = true;
+            }
+        }
+
         int count = 0;
         int start = -1;
 
         for (int i = 0; i < memory.getSize(); i++) {
             try {
-                if (memory.read(i) == null) {
+                if (!occupied[i]) {
                     if (start == -1) start = i;
                     count++;
                     if (count >= requiredSize) return start;
@@ -113,7 +131,21 @@ public class MemoryManager {
      * Track memory allocation for a process
      */
     public static void trackAllocation(int processID, int minBound, int maxBound) {
+        for (Map.Entry<Integer, int[]> entry : allocatedBlocks.entrySet()) {
+            int otherProcessId = entry.getKey();
+            int[] bounds = entry.getValue();
+            if (otherProcessId != processID && rangesOverlap(minBound, maxBound, bounds[0], bounds[1])) {
+                throw new IllegalStateException(
+                    "Memory overlap detected: P" + processID + " [" + minBound + "-" + maxBound +
+                    "] intersects P" + otherProcessId + " [" + bounds[0] + "-" + bounds[1] + "]"
+                );
+            }
+        }
         allocatedBlocks.put(processID, new int[]{minBound, maxBound});
+    }
+
+    private static boolean rangesOverlap(int aStart, int aEnd, int bStart, int bEnd) {
+        return aStart <= bEnd && bStart <= aEnd;
     }
     
     /**

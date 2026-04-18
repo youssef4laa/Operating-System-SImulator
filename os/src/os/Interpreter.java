@@ -345,6 +345,26 @@ public class Interpreter {
         // Variable region is always: [maxBound-2, maxBound-1, maxBound]
         return new int[] { pcb.maxBound - 2, pcb.maxBound };
     }
+
+    /**
+     * Keep symbol table metadata aligned with the fixed 3-slot variable model.
+     */
+    private static void validateVariableMetadata(PCB pcb) throws Exception {
+        if (pcb == null) {
+            throw new Exception("PCB is null during variable metadata validation");
+        }
+
+        int symbolCount = pcb.symbolTable.size();
+        if (symbolCount > PCB.MAX_VARIABLES_PER_PROCESS) {
+            throw new Exception("Process " + pcb.processID + " exceeded variable limit: " +
+                              symbolCount + "/" + PCB.MAX_VARIABLES_PER_PROCESS);
+        }
+
+        // Recover from stale counter state so symbol table is the source of truth.
+        if (pcb.variableCount != symbolCount) {
+            pcb.variableCount = symbolCount;
+        }
+    }
     
     /**
      * Variable Management: Store a variable in process memory
@@ -355,6 +375,8 @@ public class Interpreter {
         if (pcb == null || memory == null) {
             throw new Exception("Invalid PCB or memory for variable storage");
         }
+
+        validateVariableMetadata(pcb);
         
         // Check if variable already exists
         if (pcb.symbolTable.containsKey(varName)) {
@@ -376,6 +398,19 @@ public class Interpreter {
             int[] varBounds = getVariableRegionBounds(pcb);
             int varRegionStart = varBounds[0];
             int varRegionEnd = varBounds[1];
+
+            if (varRegionStart < pcb.minBound || varRegionEnd > pcb.maxBound) {
+                throw new Exception("Invalid variable region for process " + pcb.processID + ": [" +
+                                  varRegionStart + "," + varRegionEnd + "] out of bounds [" +
+                                  pcb.minBound + "," + pcb.maxBound + "]");
+            }
+
+            if (pcb.variableCount >= PCB.MAX_VARIABLES_PER_PROCESS ||
+                pcb.symbolTable.size() >= PCB.MAX_VARIABLES_PER_PROCESS) {
+                throw new Exception("Process " + pcb.processID +
+                                  " has exhausted variable space (3 words max)");
+            }
+
             int allocAddr = -1;
             
             // Scan the variable region for empty slots
@@ -396,6 +431,9 @@ public class Interpreter {
             // Store variable at the allocated address
             memory.write(allocAddr, value);
             pcb.symbolTable.put(varName, allocAddr);
+            pcb.variableCount++;
+
+            validateVariableMetadata(pcb);
         }
     }
 

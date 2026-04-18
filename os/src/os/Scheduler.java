@@ -225,7 +225,7 @@ public class Scheduler {
                     event.eventDetails = "Process completed";
                     notifySchedulingEvent(event);
                     
-                    Process.terminateProcess(p, memory);
+                    Process.terminateProcess(p, memory, this);
                 }
             }
 
@@ -357,8 +357,17 @@ public class Scheduler {
      * Moves process to appropriate queue after execution
      */
     public void moveProcess(PCB pcb) {
-        if (pcb.status.equals("Finished")) {
-            finishedQueue.add(pcb);
+        if (pcb.status.equals("Finished") || pcb.status.equals("Terminated")) {
+            readyQueue.remove(pcb);
+            blockedQueue.remove(pcb);
+            try {
+                Process.terminateProcess(pcb, memory, this);
+            } catch (Exception e) {
+                System.err.println("[SCHEDULER CLEANUP ERROR] " + e.getMessage());
+            }
+            if (!finishedQueue.contains(pcb)) {
+                finishedQueue.add(pcb);
+            }
         } else if (pcb.status.equals("Blocked")) {
             blockedQueue.add(pcb);
             
@@ -377,8 +386,21 @@ public class Scheduler {
      * Moves process to appropriate MLFQ queue
      */
     public void moveToMLFQ(PCB pcb) {
-        if (pcb.status.equals("Finished")) {
-            finishedQueue.add(pcb);
+        if (pcb.status.equals("Finished") || pcb.status.equals("Terminated")) {
+            readyQueue.remove(pcb);
+            blockedQueue.remove(pcb);
+            q0.remove(pcb);
+            q1.remove(pcb);
+            q2.remove(pcb);
+            q3.remove(pcb);
+            try {
+                Process.terminateProcess(pcb, memory, this);
+            } catch (Exception e) {
+                System.err.println("[SCHEDULER CLEANUP ERROR] " + e.getMessage());
+            }
+            if (!finishedQueue.contains(pcb)) {
+                finishedQueue.add(pcb);
+            }
             return;
         }
 

@@ -32,6 +32,9 @@ public class PCB {
 	    public String lastExecutedInstructionLine = null;
 	    public boolean isRetryingInstruction = false;
 
+	    // Mutex ownership tracking for cleanup on termination
+	    public List<Mutex> ownedMutexes;
+
 	    public PCB(int id, int min, int max) {
 	        this.processID = id;
 	        this.status = "Ready";
@@ -45,6 +48,7 @@ public class PCB {
 	        this.instructionPointer = 0;
 	        this.quantumUsed = 0;
 	        this.currentQueueLevel = 0;
+	        this.ownedMutexes = new ArrayList<>();
 	    }
 	    
 	    public String getNextInstruction() {

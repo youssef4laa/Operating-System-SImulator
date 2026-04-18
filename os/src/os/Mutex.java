@@ -45,6 +45,9 @@ public class Mutex {
 			// Mutex is free - acquire it immediately
 			isLocked = true;
 			owner = p;
+			if (p != null && !p.ownedMutexes.contains(this)) {
+				p.ownedMutexes.add(this);
+			}
 			acquireCount++;
 			if (!suppressLogging) {
 				System.out.println("  [MUTEX] Process " + p.processID + " acquired mutex '" + 
@@ -99,11 +102,22 @@ public class Mutex {
 				"' owned by process " + (owner != null ? owner.processID : "NONE"));
 			return;
 		}
+
+		if (owner == null) {
+			isLocked = false;
+			return;
+		}
+
+		PCB releasingOwner = owner;
 		
 		if (!waitQueue.isEmpty()) {
 			// Transfer ownership to next waiting process
 			PCB nextProcess = waitQueue.poll();
+			releasingOwner.ownedMutexes.remove(this);
 			owner = nextProcess;
+			if (!nextProcess.ownedMutexes.contains(this)) {
+				nextProcess.ownedMutexes.add(this);
+			}
 			nextProcess.status = "Ready";
 			
 			// Move from blocked queue to ready queue
@@ -126,6 +140,7 @@ public class Mutex {
 			}
 		} else {
 			// No waiting processes - unlock the mutex
+			releasingOwner.ownedMutexes.remove(this);
 			isLocked = false;
 			owner = null;
 			if (!suppressLogging) {
