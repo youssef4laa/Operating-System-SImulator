@@ -158,7 +158,7 @@ public class OSSimulatorGUI extends JFrame {
         algorithmSelector = new JComboBox<>(new String[]{"RR", "HRRN", "MLFQ"});
         algorithmSelector.setSelectedItem("RR");
         algorithmSelector.setPreferredSize(new Dimension(80, 25));
-        algorithmSelector.addActionListener(e -> engine.reset());
+        algorithmSelector.addActionListener(e -> resetSimulation(false));
         
         JLabel modeLabel = new JLabel("Mode:");
         modeLabel.setFont(new Font("Arial", Font.BOLD, 11));
@@ -420,6 +420,7 @@ public class OSSimulatorGUI extends JFrame {
             // Reset simulation before loading new programs
             pauseExecution();
             engine.reset();
+            timelinePanel.clearLog();
             
             // Load programs into the engine
             engine.loadProgramsFromFiles(files, arrivalTimes);
@@ -529,11 +530,24 @@ public class OSSimulatorGUI extends JFrame {
      * Reset simulation
      */
     private void resetSimulation() {
+        resetSimulation(true);
+    }
+
+    /**
+     * Reset simulation with optional success dialog
+     */
+    private void resetSimulation(boolean showDialog) {
         pauseExecution();
         engine.reset();
-        debugConsole.clear();
-        updateStatusLabel("Reset");
-        JOptionPane.showMessageDialog(this, "Simulation reset to initial state", "Success", JOptionPane.INFORMATION_MESSAGE);
+
+        // Keep UI state aligned with engine reset behavior
+        dropZone.clearPrograms();
+        timelinePanel.clearLog();
+        updateStatusLabel("Ready");
+
+        if (showDialog) {
+            JOptionPane.showMessageDialog(this, "Simulation reset to initial state", "Success", JOptionPane.INFORMATION_MESSAGE);
+        }
     }
     
     /**

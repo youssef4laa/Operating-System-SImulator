@@ -24,6 +24,7 @@ public class Interpreter {
     /**
      * Execute one instruction from the process
      * Fetch -> Decode -> Execute cycle
+     * On fatal error, terminates the process immediately
      * @param pcb Process Control Block with instruction list
      * @param memory Main memory for data storage
      */
@@ -74,17 +75,50 @@ public class Interpreter {
                 // Decrement instruction pointer to retry this instruction
                 pcb.retryInstruction();
                 System.out.println("Process " + pcb.processID + " blocked on instruction: " + instruction);
-            } else {
-                // Instruction completed successfully, advance program counter
+            } else if (!pcb.status.equals("Terminated")) {
+                // Instruction completed successfully AND process not terminated, advance program counter
                 pcb.programCounter++;
             }
+            // If status is "Terminated", do NOT increment PC; scheduler will handle cleanup
             
         } catch (Exception e) {
-            System.err.println("Execution error in Process " + pcb.processID + ": " + e.getMessage());
-            e.printStackTrace();
-            pcb.status = "Error";
-            // Process terminates on unhandled error
+            // Classify the exception as fatal or recoverable
+            String errorMsg = e.getMessage();
+            boolean isFatalError = isFatalException(e, errorMsg);
+            
+            if (isFatalError) {
+                // Fatal error: terminate the process immediately
+                System.err.println("[FATAL] Process " + pcb.processID + " terminating: " + errorMsg);
+                e.printStackTrace();
+                pcb.status = "Terminated";  // NEW STATUS: Terminated
+                // DO NOT modify PC so scheduler can identify it as terminated
+            } else {
+                // Recoverable error: mark as Error but let scheduler decide
+                System.err.println("[ERROR] Execution error in Process " + pcb.processID + ": " + errorMsg);
+                e.printStackTrace();
+                pcb.status = "Error";
+            }
         }
+    }
+    
+    /**
+     * Helper: Classify if an exception is fatal
+     * Fatal errors cause immediate process termination
+     * Examples: exhausted variable space, memory violation, undefined variable in critical operation
+     */
+    private static boolean isFatalException(Exception e, String errorMsg) {
+        if (errorMsg == null) return true;  // Default to fatal for unknown errors
+        
+        boolean isFatal = errorMsg.contains("exhausted variable space") ||
+                         errorMsg.contains("Memory access") ||
+                         errorMsg.contains("outside process") ||
+                         errorMsg.contains("Memory Access Violation") ||
+                         errorMsg.contains("invalid address") ||
+                         errorMsg.contains("Memory access denied") ||
+                         errorMsg.contains("Undefined value") ||
+                         errorMsg.contains("Variable not defined" );
+        
+        return isFatal;
     }
 
     /**
@@ -191,20 +225,17 @@ public class Interpreter {
 
     /**
      * Instruction: print variable value to console
+     * Resolves variable value and prints it
      * No longer protected by mutex - use semWait/semSignal for serialization
      */
     private static void handlePrint(Parser.Instruction inst, PCB pcb, Memory memory) throws Exception {
         String varName = inst.args.get(0);
         
-        // Retrieve variable value
-        Object value = retrieveVariable(varName, pcb, memory);
+        // RESOLVE argument: check if it's a variable, use its value; otherwise use as literal
+        String resolvedMessage = resolveArgument(varName, pcb, memory);
         
-        if (value == null) {
-            throw new Exception("Variable not defined: " + varName);
-        }
-        
-        // Execute system call directly (no mutex protection)
-        SystemCall.print(value.toString());
+        // Execute system call with resolved value
+        SystemCall.print(resolvedMessage);
     }
 
     /**
@@ -230,17 +261,21 @@ public class Interpreter {
 
     /**
      * Instruction: read file contents into variable
+     * Resolves filename from variable if needed
      * No longer protected by mutex - use semWait/semSignal for serialization
      */
     private static void handleReadFile(Parser.Instruction inst, PCB pcb, Memory memory) throws Exception {
-        String filename = inst.args.get(0);
+        String filenameArg = inst.args.get(0);
         String storeVar = inst.args.size() > 1 ? inst.args.get(1) : "fileData";
         
-        // Execute system call directly (no mutex protection)
-        String fileContents = SystemCall.readFile(filename);
+        // RESOLVE filename: check if it's a variable, use its value; otherwise use literal
+        String resolvedFilename = resolveArgument(filenameArg, pcb, memory);
+        
+        // Execute system call with resolved filename
+        String fileContents = SystemCall.readFile(resolvedFilename);
         
         if (fileContents == null) {
-            throw new Exception("Failed to read file: " + filename);
+            throw new Exception("Failed to read file: " + resolvedFilename);
         }
         
         // Store contents in variable
@@ -249,23 +284,24 @@ public class Interpreter {
 
     /**
      * Instruction: write data to file
+     * Resolves both filename and data from variables if needed
      * No longer protected by mutex - use semWait/semSignal for serialization
      */
     private static void handleWriteFile(Parser.Instruction inst, PCB pcb, Memory memory) throws Exception {
-        String filename = inst.args.get(0);
-        String dataStr = String.join(" ", inst.args.subList(1, inst.args.size()));
+        String filenameArg = inst.args.get(0);
+        String dataArg = String.join(" ", inst.args.subList(1, inst.args.size()));
         
-        // Get data value (could be variable or literal)
-        Object dataValue = retrieveVariable(dataStr, pcb, memory);
-        if (dataValue == null) {
-            dataValue = dataStr; // Use literal string if not a variable
-        }
+        // RESOLVE filename: check if it's a variable, use its value; otherwise use literal
+        String resolvedFilename = resolveArgument(filenameArg, pcb, memory);
         
-        // Execute system call directly (no mutex protection)
-        int result = SystemCall.writeFile(filename, dataValue.toString());
+        // RESOLVE data: check if it's a variable, use its value; otherwise use literal
+        String resolvedData = resolveArgument(dataArg, pcb, memory);
+        
+        // Execute system call with resolved values
+        int result = SystemCall.writeFile(resolvedFilename, resolvedData);
         
         if (result != SystemCall.SUCCESS) {
-            throw new Exception("Failed to write to file: " + filename);
+            throw new Exception("Failed to write to file: " + resolvedFilename + " (error code: " + result + ")");
         }
     }
 
@@ -301,36 +337,63 @@ public class Interpreter {
     }
 
     /**
+     * Helper: Get the variable region bounds for a process
+     * Variables are ALWAYS stored in the last 3 words of process memory
+     * @return array [varStart, varEnd] representing the 3-word variable region
+     */
+    private static int[] getVariableRegionBounds(PCB pcb) {
+        // Variable region is always: [maxBound-2, maxBound-1, maxBound]
+        return new int[] { pcb.maxBound - 2, pcb.maxBound };
+    }
+    
+    /**
      * Variable Management: Store a variable in process memory
      * Creates symbol table entry pointing to memory location
+     * Enforces strict bounds: variables go in reserved 3-word region only
      */
     private static void storeVariable(String varName, Object value, PCB pcb, Memory memory) throws Exception {
+        if (pcb == null || memory == null) {
+            throw new Exception("Invalid PCB or memory for variable storage");
+        }
+        
         // Check if variable already exists
         if (pcb.symbolTable.containsKey(varName)) {
             int address = pcb.symbolTable.get(varName);
+            // Verify address is within variable region
+            int[] varBounds = getVariableRegionBounds(pcb);
+            if (address < varBounds[0] || address > varBounds[1]) {
+                throw new Exception("Variable " + varName + " stored at invalid address " + address);
+            }
             if (MemoryManager.isAccessAllowed(pcb, address)) {
                 memory.write(address, value);
+            } else {
+                throw new Exception("Memory access denied for variable " + varName + " at address " + address);
             }
         } else {
             // Allocate new variable in process memory
-            // Variables must go in the reserved variable region: last 3 words
+            // Variables MUST go in the reserved variable region: last 3 words
             // Variable region: [maxBound-2, maxBound-1, maxBound]
-            int varRegionStart = pcb.maxBound - 2;
+            int[] varBounds = getVariableRegionBounds(pcb);
+            int varRegionStart = varBounds[0];
+            int varRegionEnd = varBounds[1];
             int allocAddr = -1;
             
-            for (int i = varRegionStart; i <= pcb.maxBound; i++) {
+            // Scan the variable region for empty slots
+            for (int i = varRegionStart; i <= varRegionEnd; i++) {
                 Object current = memory.read(i);
-                if (current == null || (current instanceof String && ((String)current).isEmpty())) {
-                    allocAddr = i;
+                // Check if slot is empty (null)
+                if (current == null) {
+                    allocAddr = i;  // Use first empty slot
                     break;
                 }
             }
             
             if (allocAddr == -1) {
+                // No empty slots found
                 throw new Exception("Process " + pcb.processID + " has exhausted variable space (3 words max)");
             }
             
-            // Store variable
+            // Store variable at the allocated address
             memory.write(allocAddr, value);
             pcb.symbolTable.put(varName, allocAddr);
         }
@@ -338,20 +401,49 @@ public class Interpreter {
 
     /**
      * Variable Management: Retrieve a variable value from process memory
+     * Validates that variable is stored within process bounds
      */
     private static Object retrieveVariable(String varName, PCB pcb, Memory memory) throws Exception {
-        if (!pcb.symbolTable.containsKey(varName)) {
+        if (pcb == null || !pcb.symbolTable.containsKey(varName)) {
             return null; // Variable not defined
         }
         
         int address = pcb.symbolTable.get(varName);
-        if (MemoryManager.isAccessAllowed(pcb, address)) {
-            return memory.read(address);
+        
+        // Verify variable is within process bounds
+        if (!MemoryManager.isAccessAllowed(pcb, address)) {
+            throw new Exception("Variable " + varName + " at address " + address + 
+                              " is outside process " + pcb.processID + " bounds");
         }
         
-        return null;
+        return memory.read(address);
     }
 
+    /**
+     * Helper: Resolve an argument (could be variable name or literal)
+     * Looks up variables in the symbol table, returns the stored value or literal
+     * @param argument The argument string (variable name or literal)
+     * @param pcb Process Control Block
+     * @param memory Main memory
+     * @return Resolved value (from symbol table) or the original argument if not a variable
+     */
+    private static String resolveArgument(String argument, PCB pcb, Memory memory) throws Exception {
+        if (argument == null) {
+            throw new Exception("Cannot resolve null argument");
+        }
+        
+        // Check if argument is a variable in the symbol table
+        if (pcb.symbolTable.containsKey(argument)) {
+            Object value = retrieveVariable(argument, pcb, memory);
+            if (value != null) {
+                return value.toString();
+            }
+        }
+        
+        // Not a variable, return as literal
+        return argument;
+    }
+    
     /**
      * Helper: Resolve a string value that could be a variable or literal
      */

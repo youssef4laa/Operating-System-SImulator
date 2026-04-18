@@ -222,8 +222,15 @@ public class SimulationEngine {
                     Interpreter.execute(nextPCB, memory);
                     instructionsExecuted++;
                     
-                    // Check if process finished
-                    if (nextPCB.instructionPointer >= nextPCB.instructionList.size()) {
+                    // CHECK FOR TERMINATION: If process was fatally terminated, remove from all queues
+                    if (nextPCB.status.equals("Terminated")) {
+                        debugConsole.log("  -> Process P" + nextPCB.processID + " TERMINATED (fatal error)");
+                        scheduler.readyQueue.remove(nextPCB);
+                        scheduler.blockedQueue.remove(nextPCB);
+                        scheduler.finishedQueue.add(nextPCB);
+                    }
+                    // Check if process finished normally
+                    else if (nextPCB.instructionPointer >= nextPCB.instructionList.size()) {
                         debugConsole.log("  -> Process P" + nextPCB.processID + " completed");
                         scheduler.readyQueue.remove(nextPCB);
                         scheduler.finishedQueue.add(nextPCB);
@@ -297,9 +304,16 @@ public class SimulationEngine {
         initialized = false;
         currentProcess = null;
         currentInstruction = "";
-        // Note: Do NOT clear fileProgramQueue - user can reload same programs
+        fileProgramQueue.clear();
+
+        int deletedFiles = SystemCall.cleanupGeneratedFiles();
+        SystemCall.resetStatistics();
+        SystemCall.clearCurrentProcessId();
         
         debugConsole.clear();
+        if (deletedFiles > 0) {
+            debugConsole.log("Reset cleanup: deleted " + deletedFiles + " generated file(s)");
+        }
         debugConsole.log("Simulation reset");
         if (listener != null) listener.onReset();
     }
