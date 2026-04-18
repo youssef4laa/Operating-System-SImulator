@@ -67,6 +67,13 @@ public class Mutex {
 				waitQueue.add(p);
 				p.status = "Blocked";
 				scheduler.blockedQueue.add(p);
+				SchedulingEvent event = new SchedulingEvent(
+					SchedulingEvent.EventType.PROCESS_BLOCKED,
+					scheduler.time,
+					p
+				);
+				event.eventDetails = "Blocked on mutex '" + resourceName + "' owned by P" + owner.processID;
+				scheduler.emitSchedulingEvent(event);
 				if (!suppressLogging) {
 					System.out.println("  [MUTEX] Process " + p.processID + " blocked on mutex '" + 
 						resourceName + "' (waiting for process " + owner.processID + ")");
@@ -102,6 +109,13 @@ public class Mutex {
 			// Move from blocked queue to ready queue
 			if (scheduler.blockedQueue.remove(nextProcess)) {
 				scheduler.readyQueue.add(nextProcess);
+				SchedulingEvent event = new SchedulingEvent(
+					SchedulingEvent.EventType.PROCESS_UNBLOCKED,
+					scheduler.time,
+					nextProcess
+				);
+				event.eventDetails = "Unblocked from mutex '" + resourceName + "' and moved to ready queue";
+				scheduler.emitSchedulingEvent(event);
 				if (!suppressLogging) {
 					System.out.println("  [MUTEX] Released to Process " + nextProcess.processID + 
 						" from mutex '" + resourceName + "' (next in queue)");

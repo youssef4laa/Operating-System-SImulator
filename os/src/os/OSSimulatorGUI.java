@@ -309,6 +309,7 @@ public class OSSimulatorGUI extends JFrame {
         
         // Tab 3: Mutexes
         mutexPanel = new MutexStatusPanel();
+        mutexPanel.setMutexManager(engine.getMutexManager());
         tabPane.addTab("Mutexes", mutexPanel);
         
         // Tab 4: Statistics
@@ -539,6 +540,7 @@ public class OSSimulatorGUI extends JFrame {
     private void resetSimulation(boolean showDialog) {
         pauseExecution();
         engine.reset();
+        mutexPanel.setMutexManager(engine.getMutexManager());
 
         // Keep UI state aligned with engine reset behavior
         dropZone.clearPrograms();
@@ -555,6 +557,7 @@ public class OSSimulatorGUI extends JFrame {
      */
     private void updateAll() {
         SwingUtilities.invokeLater(() -> {
+            mutexPanel.setMutexManager(engine.getMutexManager());
             memoryPanel.update(engine.getMemory());
             readyQueuePanel.update(engine.getScheduler().readyQueue);
             blockedQueuePanel.update(engine.getScheduler().blockedQueue);

@@ -83,6 +83,20 @@ public class Scheduler {
     }
 
     /**
+     * Public wrapper for GUI-side execution paths that need to emit scheduling events.
+     */
+    public void emitSchedulingEvent(SchedulingEvent event) {
+        notifySchedulingEvent(event);
+    }
+
+    /**
+     * Synchronize scheduler time with external drivers (e.g., SimulationEngine).
+     */
+    public void setTime(int time) {
+        this.time = time;
+    }
+
+    /**
      * Observer Pattern: Notify all observers of a clock cycle (for memory/state snapshots)
      */
     private void notifyClockCycle(int clockCycle) {

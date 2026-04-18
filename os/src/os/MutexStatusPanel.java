@@ -2,6 +2,8 @@ package os;
 
 import javax.swing.*;
 import java.awt.*;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * MutexStatusPanel - Displays status of 3 system mutexes
@@ -10,6 +12,10 @@ import java.awt.*;
 public class MutexStatusPanel extends JPanel {
     
     private JPanel mutexContainer;
+    private MutexManager mutexManager;
+    private final Map<String, JLabel> statusLabels = new HashMap<>();
+    private final Map<String, JLabel> ownerLabels = new HashMap<>();
+    private final Map<String, JLabel> waitLabels = new HashMap<>();
     
     public MutexStatusPanel() {
         this.setLayout(new BorderLayout(10, 10));
@@ -21,11 +27,11 @@ public class MutexStatusPanel extends JPanel {
         mutexContainer.setOpaque(false);
         
         // Add three mutex status displays
-        mutexContainer.add(createMutexDisplay("File Access"));
+        mutexContainer.add(createMutexDisplay("file", "File Access"));
         mutexContainer.add(Box.createVerticalStrut(5));
-        mutexContainer.add(createMutexDisplay("User Input"));
+        mutexContainer.add(createMutexDisplay("userinput", "User Input"));
         mutexContainer.add(Box.createVerticalStrut(5));
-        mutexContainer.add(createMutexDisplay("User Output"));
+        mutexContainer.add(createMutexDisplay("useroutput", "User Output"));
         mutexContainer.add(Box.createVerticalGlue());
         
         JScrollPane scrollPane = new JScrollPane(mutexContainer);
@@ -36,7 +42,7 @@ public class MutexStatusPanel extends JPanel {
     /**
      * Create visual display for a single mutex
      */
-    private JPanel createMutexDisplay(String resourceName) {
+    private JPanel createMutexDisplay(String resourceKey, String resourceName) {
         JPanel mutexBox = new JPanel();
         mutexBox.setLayout(new BoxLayout(mutexBox, BoxLayout.Y_AXIS));
         mutexBox.setBackground(Color.WHITE);
@@ -48,17 +54,17 @@ public class MutexStatusPanel extends JPanel {
         JLabel statusLabel = new JLabel("● Free");
         statusLabel.setFont(new Font("Arial", Font.PLAIN, 11));
         statusLabel.setForeground(new Color(0, 153, 0));
-        statusLabel.setName("status_" + resourceName);
+        statusLabels.put(resourceKey, statusLabel);
         
         // Owner
         JLabel ownerLabel = new JLabel("Owner: None");
         ownerLabel.setFont(new Font("Arial", Font.PLAIN, 10));
-        ownerLabel.setName("owner_" + resourceName);
+        ownerLabels.put(resourceKey, ownerLabel);
         
         // Wait queue
         JLabel waitLabel = new JLabel("Waiting: 0 processes");
         waitLabel.setFont(new Font("Arial", Font.PLAIN, 10));
-        waitLabel.setName("wait_" + resourceName);
+        waitLabels.put(resourceKey, waitLabel);
         
         mutexBox.add(statusLabel);
         mutexBox.add(ownerLabel);
@@ -70,8 +76,41 @@ public class MutexStatusPanel extends JPanel {
      * Update mutex status display
      */
     public void update() {
-        // This would be called to update mutex states
-        // For now, just placeholder implementation
-        // In future, integrate with actual MutexManager
+        if (mutexManager == null) {
+            return;
+        }
+
+        refreshResource("file");
+        refreshResource("userinput");
+        refreshResource("useroutput");
+    }
+
+    public void setMutexManager(MutexManager mutexManager) {
+        this.mutexManager = mutexManager;
+    }
+
+    private void refreshResource(String resourceKey) {
+        Mutex mutex = mutexManager.getMutex(resourceKey);
+        if (mutex == null) {
+            return;
+        }
+
+        JLabel statusLabel = statusLabels.get(resourceKey);
+        JLabel ownerLabel = ownerLabels.get(resourceKey);
+        JLabel waitLabel = waitLabels.get(resourceKey);
+
+        if (mutex.isLocked()) {
+            statusLabel.setText("● Locked");
+            statusLabel.setForeground(new Color(204, 0, 0));
+        } else {
+            statusLabel.setText("● Free");
+            statusLabel.setForeground(new Color(0, 153, 0));
+        }
+
+        PCB owner = mutex.getOwner();
+        ownerLabel.setText(owner == null ? "Owner: None" : "Owner: P" + owner.processID);
+
+        int waiting = mutex.getWaitQueueSize();
+        waitLabel.setText("Waiting: " + waiting + (waiting == 1 ? " process" : " processes"));
     }
 }

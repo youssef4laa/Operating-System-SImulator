@@ -201,45 +201,197 @@ public class SimulationEngine {
             }
             return;
         }
-        
-        // Schedule and execute one instruction from current/next process
+
+        scheduler.setTime(clockCycle);
+
+        // Schedule and execute according to selected algorithm
         try {
-            // Get next process to execute
-            PCB nextPCB = scheduler.selectNextProcess();
-            
-            if (nextPCB != null) {
-                currentProcess = null; // Get from process list if needed
-                
-                debugConsole.log("[Clock " + clockCycle + "] Process P" + nextPCB.processID + 
-                                " executing, PC: " + nextPCB.programCounter);
-                
-                // Execute one instruction
-                if (nextPCB.instructionPointer < nextPCB.instructionList.size()) {
-                    String instructionString = nextPCB.instructionList.get(nextPCB.instructionPointer);
-                    debugConsole.log("  Instruction: " + instructionString);
-                    
-                    // Use the interpreter to execute the instruction
-                    Interpreter.execute(nextPCB, memory);
-                    instructionsExecuted++;
-                    
-                    // CHECK FOR TERMINATION: If process was fatally terminated, remove from all queues
-                    if (nextPCB.status.equals("Terminated")) {
-                        debugConsole.log("  -> Process P" + nextPCB.processID + " TERMINATED (fatal error)");
-                        scheduler.readyQueue.remove(nextPCB);
-                        scheduler.blockedQueue.remove(nextPCB);
-                        scheduler.finishedQueue.add(nextPCB);
-                    }
-                    // Check if process finished normally
-                    else if (nextPCB.instructionPointer >= nextPCB.instructionList.size()) {
-                        debugConsole.log("  -> Process P" + nextPCB.processID + " completed");
-                        scheduler.readyQueue.remove(nextPCB);
-                        scheduler.finishedQueue.add(nextPCB);
-                    }
-                }
+            if ("RR".equalsIgnoreCase(scheduler.algorithm)) {
+                executeRRQuantumStep();
+            } else {
+                executeSingleInstructionStep();
             }
-            
         } catch (Exception e) {
             debugConsole.log("Scheduler cycle error: " + e.getMessage(), true);
+        }
+    }
+
+    /**
+     * GUI step mode for RR: execute one full quantum (up to 2 instructions).
+     */
+    private void executeRRQuantumStep() {
+        if (scheduler.readyQueue.isEmpty()) {
+            return;
+        }
+
+        PCB nextPCB = scheduler.readyQueue.poll();
+        if (nextPCB == null) {
+            return;
+        }
+
+        currentProcess = null;
+        nextPCB.status = "Running";
+        nextPCB.quantumUsed = 0;
+
+        SchedulingEvent selectedEvent = new SchedulingEvent(
+            SchedulingEvent.EventType.PROCESS_SELECTED,
+            clockCycle,
+            nextPCB
+        );
+        selectedEvent.eventDetails = "Selected from ready queue (RR)";
+        scheduler.emitSchedulingEvent(selectedEvent);
+
+        int quantum = 2;
+        while (nextPCB.quantumUsed < quantum && "Running".equals(nextPCB.status)) {
+            if (nextPCB.instructionPointer >= nextPCB.instructionList.size()) {
+                nextPCB.status = "Finished";
+                break;
+            }
+
+            String instructionString = nextPCB.instructionList.get(nextPCB.instructionPointer);
+            currentInstruction = instructionString;
+            debugConsole.log("[Clock " + clockCycle + "] Process P" + nextPCB.processID +
+                           " executing, PC: " + nextPCB.programCounter);
+            debugConsole.log("  Instruction: " + instructionString);
+
+            Interpreter.execute(nextPCB, memory);
+            instructionsExecuted++;
+            nextPCB.quantumUsed++;
+
+            if ("Terminated".equals(nextPCB.status)) {
+                debugConsole.log("  -> Process P" + nextPCB.processID + " TERMINATED (fatal error)");
+                scheduler.blockedQueue.remove(nextPCB);
+                scheduler.finishedQueue.add(nextPCB);
+
+                SchedulingEvent finishedEvent = new SchedulingEvent(
+                    SchedulingEvent.EventType.PROCESS_FINISHED,
+                    clockCycle,
+                    nextPCB
+                );
+                finishedEvent.eventDetails = "Process terminated due to fatal error";
+                scheduler.emitSchedulingEvent(finishedEvent);
+                return;
+            }
+
+            if ("Blocked".equals(nextPCB.status)) {
+                debugConsole.log("  -> Process P" + nextPCB.processID + " blocked on resource");
+                return;
+            }
+
+            if (nextPCB.instructionPointer >= nextPCB.instructionList.size()) {
+                nextPCB.status = "Finished";
+                debugConsole.log("  -> Process P" + nextPCB.processID + " completed");
+                scheduler.finishedQueue.add(nextPCB);
+
+                SchedulingEvent finishedEvent = new SchedulingEvent(
+                    SchedulingEvent.EventType.PROCESS_FINISHED,
+                    clockCycle,
+                    nextPCB
+                );
+                finishedEvent.eventDetails = "Process completed";
+                scheduler.emitSchedulingEvent(finishedEvent);
+                return;
+            }
+        }
+
+        if ("Running".equals(nextPCB.status)) {
+            nextPCB.status = "Ready";
+            scheduler.readyQueue.add(nextPCB);
+
+            SchedulingEvent quantumEvent = new SchedulingEvent(
+                SchedulingEvent.EventType.TIME_QUANTUM_EXPIRED,
+                clockCycle,
+                nextPCB
+            );
+            quantumEvent.eventDetails = "RR quantum expired; moved to back of ready queue";
+            scheduler.emitSchedulingEvent(quantumEvent);
+            debugConsole.log("  -> RR quantum expired for P" + nextPCB.processID + " (2/2)");
+        }
+    }
+
+    /**
+     * Non-RR algorithms keep single-instruction GUI stepping behavior.
+     */
+    private void executeSingleInstructionStep() {
+        PCB nextPCB = scheduler.selectNextProcess();
+
+        if (nextPCB == null) {
+            return;
+        }
+
+        currentProcess = null;
+        if ("Ready".equals(nextPCB.status)) {
+            nextPCB.status = "Running";
+        }
+
+        SchedulingEvent selectedEvent = new SchedulingEvent(
+            SchedulingEvent.EventType.PROCESS_SELECTED,
+            clockCycle,
+            nextPCB
+        );
+        selectedEvent.eventDetails = "Selected for single-step execution";
+        scheduler.emitSchedulingEvent(selectedEvent);
+
+        if (nextPCB.instructionPointer >= nextPCB.instructionList.size()) {
+            nextPCB.status = "Finished";
+            scheduler.readyQueue.remove(nextPCB);
+            scheduler.finishedQueue.add(nextPCB);
+
+            SchedulingEvent finishedEvent = new SchedulingEvent(
+                SchedulingEvent.EventType.PROCESS_FINISHED,
+                clockCycle,
+                nextPCB
+            );
+            finishedEvent.eventDetails = "Process completed";
+            scheduler.emitSchedulingEvent(finishedEvent);
+            return;
+        }
+
+        String instructionString = nextPCB.instructionList.get(nextPCB.instructionPointer);
+        currentInstruction = instructionString;
+        debugConsole.log("[Clock " + clockCycle + "] Process P" + nextPCB.processID +
+                       " executing, PC: " + nextPCB.programCounter);
+        debugConsole.log("  Instruction: " + instructionString);
+
+        Interpreter.execute(nextPCB, memory);
+        instructionsExecuted++;
+
+        if ("Terminated".equals(nextPCB.status)) {
+            debugConsole.log("  -> Process P" + nextPCB.processID + " TERMINATED (fatal error)");
+            scheduler.readyQueue.remove(nextPCB);
+            scheduler.blockedQueue.remove(nextPCB);
+            scheduler.finishedQueue.add(nextPCB);
+
+            SchedulingEvent finishedEvent = new SchedulingEvent(
+                SchedulingEvent.EventType.PROCESS_FINISHED,
+                clockCycle,
+                nextPCB
+            );
+            finishedEvent.eventDetails = "Process terminated due to fatal error";
+            scheduler.emitSchedulingEvent(finishedEvent);
+            return;
+        }
+
+        if ("Blocked".equals(nextPCB.status)) {
+            scheduler.readyQueue.remove(nextPCB);
+            return;
+        }
+
+        if (nextPCB.instructionPointer >= nextPCB.instructionList.size()) {
+            nextPCB.status = "Finished";
+            debugConsole.log("  -> Process P" + nextPCB.processID + " completed");
+            scheduler.readyQueue.remove(nextPCB);
+            scheduler.finishedQueue.add(nextPCB);
+
+            SchedulingEvent finishedEvent = new SchedulingEvent(
+                SchedulingEvent.EventType.PROCESS_FINISHED,
+                clockCycle,
+                nextPCB
+            );
+            finishedEvent.eventDetails = "Process completed";
+            scheduler.emitSchedulingEvent(finishedEvent);
+        } else if ("Running".equals(nextPCB.status)) {
+            nextPCB.status = "Ready";
         }
     }
     
@@ -335,6 +487,10 @@ public class SimulationEngine {
     
     public Scheduler getScheduler() {
         return scheduler;
+    }
+
+    public MutexManager getMutexManager() {
+        return scheduler.getMutexManager();
     }
     
     public int getClockCycle() {
