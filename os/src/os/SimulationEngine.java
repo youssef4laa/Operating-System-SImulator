@@ -189,7 +189,11 @@ public class SimulationEngine {
      * Execute one scheduler cycle
      */
     private void executeSchedulerCycle() {
-        if (scheduler.readyQueue.isEmpty() && scheduler.blockedQueue.isEmpty()) {
+        boolean allMLFQEmpty = scheduler.q0.isEmpty() && scheduler.q1.isEmpty() && 
+                               scheduler.q2.isEmpty() && scheduler.q3.isEmpty();
+        boolean hrnActive = currentRunningPCB != null && "Running".equals(currentRunningPCB.status);
+
+        if (scheduler.readyQueue.isEmpty() && scheduler.blockedQueue.isEmpty() && allMLFQEmpty && !hrnActive) {
             if (running) {
                 running = false;
                 debugConsole.log("\n========================================");
