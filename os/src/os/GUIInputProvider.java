@@ -37,6 +37,24 @@ public class GUIInputProvider implements InputProvider {
         
         return result[0];
     }
+
+    /**
+     * Show a modal output dialog (error/info) for process-related events.
+     */
+    @Override
+    public void showOutputMessage(String processId, String title, String message, boolean isError) {
+        Runnable dialogTask = () -> showMessageDialog(processId, title, message, isError);
+
+        if (SwingUtilities.isEventDispatchThread()) {
+            dialogTask.run();
+        } else {
+            try {
+                SwingUtilities.invokeAndWait(dialogTask);
+            } catch (Exception e) {
+                System.err.println("[OUTPUT DIALOG ERROR] " + e.getMessage());
+            }
+        }
+    }
     
     /**
      * Internal method to show the actual dialog
@@ -53,5 +71,20 @@ public class GUIInputProvider implements InputProvider {
         );
         
         return input; // null if cancelled, otherwise the string entered
+    }
+
+    /**
+     * Internal method to show output/error dialogs.
+     */
+    private void showMessageDialog(String processId, String title, String message, boolean isError) {
+        String fullMessage = "Process " + processId + ":\n\n" + message;
+        int messageType = isError ? JOptionPane.ERROR_MESSAGE : JOptionPane.INFORMATION_MESSAGE;
+
+        JOptionPane.showMessageDialog(
+            null,
+            fullMessage,
+            title,
+            messageType
+        );
     }
 }

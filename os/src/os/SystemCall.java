@@ -431,4 +431,20 @@ public class SystemCall {
     public static void clearCurrentProcessId() {
         currentProcessId = null;
     }
+
+    /**
+     * Show a process-related output message using GUI provider when available.
+     * Safe in CLI mode (no-op when provider is not set).
+     */
+    public static void showProcessOutputMessage(String processId, String title, String message, boolean isError) {
+        if (inputProvider == null) {
+            return;
+        }
+
+        try {
+            inputProvider.showOutputMessage(processId, title, message, isError);
+        } catch (Exception e) {
+            System.err.println("[SYSCALL ERROR] output dialog failed: " + e.getMessage());
+        }
+    }
 }

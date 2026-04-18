@@ -14,6 +14,16 @@ public class Interpreter {
     private static Mutex mutexFile;
     private static Scheduler scheduler;
 
+    /**
+     * Exception type for handled runtime errors that should stop a process cleanly
+     * without printing a full Java stack trace.
+     */
+    private static class HandledRuntimeException extends Exception {
+        HandledRuntimeException(String message) {
+            super(message);
+        }
+    }
+
     public static void initialize(Scheduler sched, Mutex out, Mutex in, Mutex file) {
         scheduler = sched;
         mutexUserOutput = out;
@@ -82,6 +92,13 @@ public class Interpreter {
             // If status is "Terminated", do NOT increment PC; scheduler will handle cleanup
             
         } catch (Exception e) {
+            if (e instanceof HandledRuntimeException) {
+                String handledMsg = e.getMessage() != null ? e.getMessage() : "Runtime error";
+                System.err.println("[ERROR] Execution error in Process " + pcb.processID + ": " + handledMsg);
+                pcb.status = "Error";
+                return;
+            }
+
             // Classify the exception as fatal or recoverable
             String errorMsg = e.getMessage();
             boolean isFatalError = isFatalException(e, errorMsg);
@@ -201,7 +218,8 @@ public class Interpreter {
             value = SystemCall.readFile(filename);
             
             if (value == null) {
-                throw new Exception("Failed to read file: " + filename);
+                showReadFileNotFoundPopup(pcb, filename);
+                throw new HandledRuntimeException("Failed to read file: " + filename);
             }
         }
         // Pattern 3: numeric literal
@@ -275,7 +293,8 @@ public class Interpreter {
         String fileContents = SystemCall.readFile(resolvedFilename);
         
         if (fileContents == null) {
-            throw new Exception("Failed to read file: " + resolvedFilename);
+            showReadFileNotFoundPopup(pcb, resolvedFilename);
+            throw new HandledRuntimeException("Failed to read file: " + resolvedFilename);
         }
         
         // Store contents in variable
@@ -516,6 +535,17 @@ public class Interpreter {
         }
         
         throw new Exception("Undefined value: " + value);
+    }
+
+    /**
+     * Show an error popup for readFile file-not-found scenarios in GUI mode.
+     */
+    private static void showReadFileNotFoundPopup(PCB pcb, String filename) {
+        String processId = pcb != null ? "P_" + pcb.processID : "Unknown";
+        String title = "Process " + processId + " - File Read Error";
+        String message = "File not found:\n" + filename + "\n\nThis process will be stopped.";
+
+        SystemCall.showProcessOutputMessage(processId, title, message, true);
     }
 
     /**
