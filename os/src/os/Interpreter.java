@@ -253,7 +253,7 @@ public class Interpreter {
         String resolvedMessage = resolveArgument(varName, pcb, memory);
         
         // Execute system call with resolved value
-        SystemCall.print(resolvedMessage);
+        SystemCall.print(resolvedMessage, "P_" + pcb.processID);
     }
 
     /**
@@ -274,7 +274,7 @@ public class Interpreter {
             output.append(i);
             if (i < end) output.append(" ");
         }
-        SystemCall.print(output.toString());
+        SystemCall.print(output.toString(), "P_" + pcb.processID);
     }
 
     /**

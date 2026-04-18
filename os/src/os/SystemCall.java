@@ -54,6 +54,18 @@ public class SystemCall {
      * @return SUCCESS (0) on success, error code on failure
      */
     public static int print(String message) {
+        return print(message, null);
+    }
+
+    /**
+     * System Call 3: Print text to console with optional process context for GUI popup
+     * MUST be protected by mutexUserOutput before calling
+     *
+     * @param message Text message to print
+     * @param processId Process ID for GUI popup context (optional)
+     * @return SUCCESS (0) on success, error code on failure
+     */
+    public static int print(String message, String processId) {
         if (message == null) {
             logError("print: null message");
             return INVALID_PARAMETER;
@@ -61,6 +73,9 @@ public class SystemCall {
         
         try {
             System.out.println(message);
+            if (processId != null && !processId.isBlank()) {
+                showProcessOutputMessage(processId, "Process Output", message, false);
+            }
             stats.recordCall("print", SUCCESS);
             logInfo("print: '" + message + "'");
             return SUCCESS;
