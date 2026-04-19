@@ -117,6 +117,9 @@ public class SimulationEngine {
             running = false;
             initialized = true;
             
+            // Sort programs by arrival time to ensure correct execution order
+            fileProgramQueue.sort((fp1, fp2) -> Integer.compare(fp1.arrivalTime, fp2.arrivalTime));
+            
             debugConsole.log("======================================");
             debugConsole.log("Simulation Initialized");
             debugConsole.log("Algorithm: " + algorithm);
@@ -573,6 +576,14 @@ public class SimulationEngine {
             
             // Use Process.createProcess to load and parse the program file
             PCB pcb = Process.createProcess(file.getAbsolutePath(), memory);
+            
+            // Transfer arrival time from FileProgram to PCB
+            if (processIdx < fileProgramQueue.size()) {
+                FileProgram fileProgram = fileProgramQueue.get(processIdx);
+                pcb.arrivalTime = fileProgram.arrivalTime;
+                pcb.lastReadyEnqueueTime = clockCycle;  // Set when process enters ready queue
+            }
+            
             scheduler.readyQueue.add(pcb);
             
             debugConsole.log("  -> Process P" + pcb.processID + " created successfully");
