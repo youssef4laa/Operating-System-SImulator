@@ -10,6 +10,7 @@ public class PCB {
 	    public int minBound;
 	    public int maxBound;
 	    public int arrivalTime;
+	    public int lastReadyEnqueueTime;  // Track when process was last added to ready queue
 	    public int remainingTime;
 	    public int priority;
 	    
@@ -41,6 +42,8 @@ public class PCB {
 	        this.programCounter = min;
 	        this.minBound = min;
 	        this.maxBound = max;
+	        this.arrivalTime = 0;
+	        this.lastReadyEnqueueTime = 0;  // Initialize to 0, will be set when enqueued
 	        this.allocationSize = (max - min + 1);
 	        this.instructionList = new ArrayList<>();
 	        this.symbolTable = new HashMap<>();

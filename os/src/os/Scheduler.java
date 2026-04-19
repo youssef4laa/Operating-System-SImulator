@@ -285,13 +285,14 @@ public class Scheduler {
 
     /**
      * HRRN - Highest Response Ratio Next (non-preemptive)
+     * Waiting time is measured from when the process was last added to the ready queue
      */
     public PCB HRRN() {
         PCB best = null;
         double maxRatio = -1;
 
         for (PCB p : readyQueue) {
-            int waiting = time - p.arrivalTime;
+            int waiting = time - p.lastReadyEnqueueTime;
             int burst = p.remainingTime;
 
             double ratio = (waiting + burst) / (double) burst;
@@ -397,6 +398,7 @@ public class Scheduler {
             notifySchedulingEvent(event);
         } else if (pcb.status.equals("Running")) {
             pcb.status = "Ready";
+            pcb.lastReadyEnqueueTime = time;  // Update when process is re-queued
             readyQueue.add(pcb);
         }
     }
@@ -429,6 +431,7 @@ public class Scheduler {
         }
 
         pcb.status = "Ready";
+        pcb.lastReadyEnqueueTime = time;  // Update when process is re-queued
 
         switch (pcb.currentQueueLevel) {
             case 0: q0.add(pcb); break;
@@ -448,6 +451,7 @@ public class Scheduler {
             PCB p1 = createProcessWithSwap("Program1.txt", memory);
             if (p1 != null) {
                 p1.arrivalTime = time;
+                p1.lastReadyEnqueueTime = time;  // Set ready queue enqueue time
                 readyQueue.add(p1);  // First process, add normally
                 q0.add(p1);
                 System.out.println(">>> Process 1 arrived at time " + time);
@@ -458,6 +462,7 @@ public class Scheduler {
             PCB p2 = createProcessWithSwap("Program2.txt", memory);
             if (p2 != null) {
                 p2.arrivalTime = time;
+                p2.lastReadyEnqueueTime = time;  // Set ready queue enqueue time
                 // RR fairness: Add newly arrived processes to the FRONT so they get a turn
                 // before any process gets a second turn
                 readyQueue.addFirst(p2);
@@ -470,6 +475,7 @@ public class Scheduler {
             PCB p3 = createProcessWithSwap("Program3.txt", memory);
             if (p3 != null) {
                 p3.arrivalTime = time;
+                p3.lastReadyEnqueueTime = time;  // Set ready queue enqueue time
                 // RR fairness: Add newly arrived processes to the FRONT so they get a turn
                 // before any process gets a second turn
                 readyQueue.addFirst(p3);
@@ -597,13 +603,14 @@ public class Scheduler {
     
     /**
      * Select best process using HRRN without removing
+     * Waiting time is measured from when the process was last added to the ready queue
      */
     private PCB selectHRRN() {
         PCB best = null;
         double maxRatio = -1;
         
         for (PCB p : readyQueue) {
-            int waiting = time - p.arrivalTime;
+            int waiting = time - p.lastReadyEnqueueTime;
             int burst = p.remainingTime;
             
             double ratio = (waiting + burst) / (double) burst;

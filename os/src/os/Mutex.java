@@ -109,6 +109,7 @@ public class Mutex {
 				nextProcess.ownedMutexes.add(this);
 			}
 			nextProcess.status = "Ready";
+			nextProcess.lastReadyEnqueueTime = scheduler.time;  // Update when process re-enters ready queue
 			
 			// Move from blocked queue to ready queue
 			if (scheduler.blockedQueue.remove(nextProcess)) {
