@@ -160,12 +160,14 @@ public class SimulationEngine {
         }
         
         try {
-            // Check for new process arrivals
-            if (nextArrivalIndex < fileProgramQueue.size()) {
+            // Check for new process arrivals (load ALL processes arriving at this time)
+            while (nextArrivalIndex < fileProgramQueue.size()) {
                 FileProgram nextProgram = fileProgramQueue.get(nextArrivalIndex);
                 if (nextProgram.arrivalTime == clockCycle) {
                     createProcess(nextArrivalIndex, nextProgram.file);
                     nextArrivalIndex++;
+                } else {
+                    break; // No more processes arriving at this time
                 }
             }
             

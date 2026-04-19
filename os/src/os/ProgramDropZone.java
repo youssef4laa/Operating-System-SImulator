@@ -176,10 +176,11 @@ public class ProgramDropZone extends JPanel implements DropTargetListener {
             int index = i;
             
             // Update arrival time when spinner changes
-            // NOTE: Only update local list, don't trigger engine reload yet
             spinner.addChangeListener(e -> {
                 int newTime = (Integer) spinner.getValue();
                 arrivalTimes.set(index, newTime);
+                // Notify engine of updated arrival times
+                notifyArrivalTimesChanged();
             });
             
             arrivalTimeSpinners.add(spinner);
