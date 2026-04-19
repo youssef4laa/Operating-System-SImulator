@@ -17,9 +17,9 @@ public class ProgramDropZone extends JPanel implements DropTargetListener {
     
     private List<File> droppedFiles = new ArrayList<>();
     private List<Integer> arrivalTimes = new ArrayList<>();
+    private List<JSpinner> arrivalTimeSpinners = new ArrayList<>();
     private OnProgramsDropped onDrop;
     private boolean isDraggingOver = false;
-    private static final int ARRIVAL_TIME_INTERVAL = 1; // Gap between program arrivals
     private static final Color DROP_ZONE_COLOR = new Color(240, 248, 255);
     private static final Color DRAG_OVER_COLOR = new Color(200, 230, 255);
     private static final Color TEXT_COLOR = new Color(100, 100, 100);
@@ -130,7 +130,7 @@ public class ProgramDropZone extends JPanel implements DropTargetListener {
     }
     
     /**
-     * Display list of queued programs
+     * Display list of queued programs with editable arrival times
      */
     private void displayProgramList() {
         JPanel listPanel = new JPanel();
@@ -138,13 +138,16 @@ public class ProgramDropZone extends JPanel implements DropTargetListener {
         listPanel.setOpaque(false);
         listPanel.setBorder(BorderFactory.createEmptyBorder(10, 15, 10, 15));
         
-        JLabel titleLabel = new JLabel("Queued Programs (" + droppedFiles.size() + ")");
+        JLabel titleLabel = new JLabel("Queued Programs (" + droppedFiles.size() + ") - Set Arrival Times:");
         titleLabel.setFont(new Font("Arial", Font.BOLD, 12));
         titleLabel.setForeground(TEXT_COLOR);
         listPanel.add(titleLabel);
         listPanel.add(Box.createVerticalStrut(5));
         
-        // Display each program
+        // Clear previous spinners
+        arrivalTimeSpinners.clear();
+        
+        // Display each program with editable arrival time
         for (int i = 0; i < droppedFiles.size(); i++) {
             File file = droppedFiles.get(i);
             int arrivalTime = arrivalTimes.get(i);
@@ -152,7 +155,7 @@ public class ProgramDropZone extends JPanel implements DropTargetListener {
             JPanel programBox = new JPanel();
             programBox.setLayout(new FlowLayout(FlowLayout.LEFT, 10, 2));
             programBox.setOpaque(false);
-            programBox.setMaximumSize(new Dimension(Integer.MAX_VALUE, 25));
+            programBox.setMaximumSize(new Dimension(Integer.MAX_VALUE, 35));
             
             JLabel numLabel = new JLabel((i + 1) + ".");
             numLabel.setFont(new Font("Arial", Font.BOLD, 11));
@@ -162,20 +165,36 @@ public class ProgramDropZone extends JPanel implements DropTargetListener {
             nameLabel.setFont(new Font("Arial", Font.PLAIN, 11));
             nameLabel.setForeground(TEXT_COLOR);
             
-            JLabel timeLabel = new JLabel("→ t=" + arrivalTime);
+            JLabel timeLabel = new JLabel("Arrival Time: t =");
             timeLabel.setFont(new Font("Arial", Font.PLAIN, 10));
             timeLabel.setForeground(new Color(120, 120, 120));
+            
+            // Create spinner for arrival time (0 to 1000)
+            JSpinner spinner = new JSpinner(new SpinnerNumberModel(arrivalTime, 0, 1000, 1));
+            spinner.setPreferredSize(new Dimension(50, 25));
+            spinner.setFont(new Font("Arial", Font.PLAIN, 10));
+            int index = i;
+            
+            // Update arrival time when spinner changes
+            // NOTE: Only update local list, don't trigger engine reload yet
+            spinner.addChangeListener(e -> {
+                int newTime = (Integer) spinner.getValue();
+                arrivalTimes.set(index, newTime);
+            });
+            
+            arrivalTimeSpinners.add(spinner);
             
             JButton removeBtn = new JButton("✕");
             removeBtn.setFont(new Font("Arial", Font.PLAIN, 9));
             removeBtn.setMargin(new Insets(0, 3, 0, 3));
             removeBtn.setFocusPainted(false);
-            int index = i;
             removeBtn.addActionListener(e -> removeProgram(index));
             
             programBox.add(numLabel);
             programBox.add(nameLabel);
+            programBox.add(Box.createHorizontalStrut(10));
             programBox.add(timeLabel);
+            programBox.add(spinner);
             programBox.add(Box.createHorizontalGlue());
             programBox.add(removeBtn);
             
@@ -214,20 +233,17 @@ public class ProgramDropZone extends JPanel implements DropTargetListener {
         if (index >= 0 && index < droppedFiles.size()) {
             droppedFiles.remove(index);
             arrivalTimes.remove(index);
-            recalculateArrivalTimes();
             updateDisplay();
+            notifyArrivalTimesChanged();
         }
     }
     
     /**
-     * Recalculate arrival times after a program is removed
+     * Notify listener that arrival times have changed
      */
-    private void recalculateArrivalTimes() {
-        arrivalTimes.clear();
-        int currentTime = 0;
-        for (int i = 0; i < droppedFiles.size(); i++) {
-            arrivalTimes.add(currentTime);
-            currentTime += ARRIVAL_TIME_INTERVAL;
+    private void notifyArrivalTimesChanged() {
+        if (!droppedFiles.isEmpty() && onDrop != null) {
+            onDrop.onProgramsDropped(new ArrayList<>(droppedFiles), new ArrayList<>(arrivalTimes));
         }
     }
     
@@ -284,11 +300,11 @@ public class ProgramDropZone extends JPanel implements DropTargetListener {
                 if (file.isFile() && file.getName().endsWith(".txt")) {
                     validFiles.add(file);
                     droppedFiles.add(file);
+                    // Initialize arrival times starting from 0, incrementing by 1
+                    arrivalTimes.add(droppedFiles.size() - 1);
                 }
             }
             
-            // Recalculate arrival times
-            recalculateArrivalTimes();
             updateDisplay();
             
             // Notify listener with ALL current files
@@ -339,17 +355,17 @@ public class ProgramDropZone extends JPanel implements DropTargetListener {
                 if (file.isFile() && file.getName().endsWith(".txt")) {
                     validFiles.add(file);
                     droppedFiles.add(file);
+                    // Initialize arrival times starting from 0, incrementing by 1
+                    arrivalTimes.add(droppedFiles.size() - 1);
                 }
             }
             
             if (!validFiles.isEmpty()) {
-                // Recalculate arrival times
-                recalculateArrivalTimes();
                 updateDisplay();
                 
                 // Notify listener with new arrival times
                 if (onDrop != null) {
-                    onDrop.onProgramsDropped(validFiles, new ArrayList<>(arrivalTimes));
+                    onDrop.onProgramsDropped(new ArrayList<>(droppedFiles), new ArrayList<>(arrivalTimes));
                 }
             }
         }
