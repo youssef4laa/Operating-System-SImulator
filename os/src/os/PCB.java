@@ -28,10 +28,15 @@ public class PCB {
 	    // For MLFQ scheduling
 	    public int quantumUsed;
 	    public int currentQueueLevel;
+	    public int inheritedPriority = -1;  // Priority inherited from blocked process (-1 = not inherited)
 	    
 	    // Retry tracking to prevent duplicate logs
 	    public String lastExecutedInstructionLine = null;
 	    public boolean isRetryingInstruction = false;
+
+	    // Input caching to prevent multiple popups when instruction is retried
+	    public String lastInputValue = null;  // Cache the last input value obtained
+	    public String lastInputInstructionLine = null;  // Track which instruction line obtained this input
 
 	    // Mutex ownership tracking for cleanup on termination
 	    public List<Mutex> ownedMutexes;

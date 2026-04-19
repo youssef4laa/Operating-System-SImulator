@@ -157,8 +157,9 @@ public class SystemTraceLogger implements SchedulerObserver {
         
         // Ready Queue
         System.out.print("    Ready Queue: [");
-        if (!scheduler.readyQueue.isEmpty()) {
-            Queue<PCB> tempQueue = new ArrayDeque<>(scheduler.readyQueue);
+        Queue<PCB> rq = new ArrayDeque<>(scheduler.getReadyQueue());
+        if (!rq.isEmpty()) {
+            Queue<PCB> tempQueue = new ArrayDeque<>(rq);
             while (!tempQueue.isEmpty()) {
                 PCB p = tempQueue.poll();
                 System.out.print("P" + p.processID);

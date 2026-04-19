@@ -16,7 +16,7 @@ semWait userOutput
 print b
 semSignal userOutput
 0
-os.PCB@57e2f016
+os.PCB@4e6aa47e
 semWait userInput
 assign a input
 semSignal userInput

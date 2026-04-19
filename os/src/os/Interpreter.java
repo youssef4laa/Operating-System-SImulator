@@ -192,19 +192,30 @@ public class Interpreter {
         // Check if value is a system call that returns a value
         // Pattern 1: "input" - reads user input
         if (valueStr.equalsIgnoreCase("input")) {
-            // Set process ID context for input dialog
-            SystemCall.setCurrentProcessId("P_" + pcb.processID);
-            // Suppress logging on retry of this instruction
-            value = SystemCall.input(pcb.isRetryingInstruction);
-            SystemCall.clearCurrentProcessId();
-            
-            if (value == null) {
-                if (SystemCall.consumeInputCancelledFlag()) {
-                    // User cancelled GUI input and triggered simulation reset.
-                    pcb.status = "Finished";
-                    return;
+            // Check if we already have a cached input value from retrying this same instruction
+            if (pcb.isRetryingInstruction && 
+                pcb.lastInputInstructionLine != null && 
+                pcb.lastInputInstructionLine.equals(pcb.lastExecutedInstructionLine)) {
+                // Use cached input value instead of showing popup again
+                value = pcb.lastInputValue;
+            } else {
+                // First time executing or different instruction - show popup and cache the value
+                SystemCall.setCurrentProcessId("P_" + pcb.processID);
+                value = SystemCall.input(pcb.isRetryingInstruction);
+                SystemCall.clearCurrentProcessId();
+                
+                if (value == null) {
+                    if (SystemCall.consumeInputCancelledFlag()) {
+                        // User cancelled GUI input and triggered simulation reset.
+                        pcb.status = "Finished";
+                        return;
+                    }
+                    throw new Exception("Failed to read input");
                 }
-                throw new Exception("Failed to read input");
+                
+                // Cache the input value and the instruction line it came from
+                pcb.lastInputValue = (String) value;
+                pcb.lastInputInstructionLine = pcb.lastExecutedInstructionLine;
             }
         }
         // Pattern 2: "readFile filename" - reads file contents
@@ -243,6 +254,11 @@ public class Interpreter {
         
         // Store variable in process memory
         storeVariable(varName, value, pcb, memory);
+        
+        // Clear input cache after successful assignment
+        // (Cache is only used on retry to prevent duplicate popups)
+        pcb.lastInputValue = null;
+        pcb.lastInputInstructionLine = null;
     }
 
     /**

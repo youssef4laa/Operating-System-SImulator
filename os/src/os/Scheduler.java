@@ -19,6 +19,22 @@ public class Scheduler {
     LinkedList<PCB> q2 = new LinkedList<>();
     LinkedList<PCB> q3 = new LinkedList<>();
 
+    /**
+     * Gets the appropriate ready queue based on the current algorithm.
+     * For MLFQ, returns a combined list of all ready processes in priority order.
+     */
+    public LinkedList<PCB> getReadyQueue() {
+        if ("MLFQ".equalsIgnoreCase(algorithm)) {
+            LinkedList<PCB> combined = new LinkedList<>();
+            combined.addAll(q0);
+            combined.addAll(q1);
+            combined.addAll(q2);
+            combined.addAll(q3);
+            return combined;
+        }
+        return readyQueue;
+    }
+
     // Resource mutexes managed by MutexManager
     private MutexManager mutexManager;
     
@@ -41,6 +57,7 @@ public class Scheduler {
      * Initialize the Interpreter with mutex manager and scheduler
      * Must be called before any process execution (semWait/semSignal)
      * Separated from start() to support GUI initialization
+     * Configures MLFQ mutex features if MLFQ algorithm is selected
      */
     public void initializeInterpreter() throws Exception {
         // Initialize mutex manager
@@ -48,6 +65,16 @@ public class Scheduler {
         this.mutexUserOutput = mutexManager.getUserOutputMutex();
         this.mutexUserInput = mutexManager.getUserInputMutex();
         this.mutexFile = mutexManager.getFileMutex();
+        
+        // Configure MLFQ mutex features if using MLFQ algorithm
+        if (algorithm.equalsIgnoreCase("MLFQ")) {
+            mutexManager.configureMLFQPriorityInheritance(true);  // Enable priority inheritance
+            mutexManager.configureMLFQPriorityBoost(true);        // Enable priority boost on unblock
+            mutexManager.configureMLFQBoostLevel(0);              // Boost unblocked processes to Q0 (highest priority)
+            System.out.println("[SCHEDULER] MLFQ Mutex Features Enabled:");
+            System.out.println("  - Priority Inheritance: YES");
+            System.out.println("  - Priority Boost on Unblock: YES (to Q0)");
+        }
         
         // Initialize interpreter with scheduler and mutexes
         Interpreter.initialize(this, mutexUserOutput, mutexUserInput, mutexFile);
@@ -94,6 +121,13 @@ public class Scheduler {
      */
     public void setTime(int time) {
         this.time = time;
+    }
+
+    /**
+     * Synchronize scheduler memory reference with external drivers (e.g., SimulationEngine).
+     */
+    public void setMemory(Memory memory) {
+        this.memory = memory;
     }
 
     /**
@@ -343,11 +377,13 @@ public class Scheduler {
 
     /**
      * MLFQ - Run process with appropriate quantum for its queue level
+     * Handles inherited priority from mutex blocking (priority boost/inheritance)
      */
     public void runMLFQ(PCB pcb, Memory memory) throws Exception {
         pcb.status = "Running";
         
-        int level = pcb.currentQueueLevel; 
+        // Check for inherited priority from mutex (priority inheritance/boost)
+        int level = (pcb.inheritedPriority != -1) ? pcb.inheritedPriority : pcb.currentQueueLevel;
         int quantum = (int) Math.pow(2, level);
 
         int counter = 0;
@@ -365,9 +401,19 @@ public class Scheduler {
             }
         }
 
-        // Move to lower priority queue if used full quantum
-        if (counter == quantum && pcb.currentQueueLevel < 3) {
+        // Move to lower priority queue if used full quantum (but only if not inherited)
+        if (counter == quantum && pcb.inheritedPriority == -1 && pcb.currentQueueLevel < 3) {
+            int oldLevel = pcb.currentQueueLevel;
             pcb.currentQueueLevel++;
+            System.out.println("  [MLFQ] Queue demotion: P" + pcb.processID + 
+                " Q" + oldLevel + " → Q" + pcb.currentQueueLevel + " (used full quantum)");
+        }
+        
+        // If inherited priority was used, restore original queue level
+        if (pcb.inheritedPriority != -1 && counter == quantum) {
+            System.out.println("  [MLFQ MUTEX] Temporary boost expired: P" + pcb.processID + 
+                " returns to Q" + pcb.currentQueueLevel);
+            pcb.inheritedPriority = -1;
         }
 
         moveToMLFQ(pcb);
@@ -378,8 +424,7 @@ public class Scheduler {
      */
     public void moveProcess(PCB pcb) {
         if (pcb.status.equals("Finished") || pcb.status.equals("Terminated")) {
-            readyQueue.remove(pcb);
-            blockedQueue.remove(pcb);
+            removeFromAllQueues(pcb);
             try {
                 Process.terminateProcess(pcb, memory, this);
             } catch (Exception e) {
@@ -389,7 +434,7 @@ public class Scheduler {
                 finishedQueue.add(pcb);
             }
         } else if (pcb.status.equals("Blocked")) {
-            blockedQueue.add(pcb);
+            enqueueBlocked(pcb);
             
             // Notify observers of blocking event
             SchedulingEvent event = new SchedulingEvent(
@@ -398,8 +443,7 @@ public class Scheduler {
             notifySchedulingEvent(event);
         } else if (pcb.status.equals("Running")) {
             pcb.status = "Ready";
-            pcb.lastReadyEnqueueTime = time;  // Update when process is re-queued
-            readyQueue.add(pcb);
+            enqueueReady(pcb);
         }
     }
 
@@ -408,12 +452,7 @@ public class Scheduler {
      */
     public void moveToMLFQ(PCB pcb) {
         if (pcb.status.equals("Finished") || pcb.status.equals("Terminated")) {
-            readyQueue.remove(pcb);
-            blockedQueue.remove(pcb);
-            q0.remove(pcb);
-            q1.remove(pcb);
-            q2.remove(pcb);
-            q3.remove(pcb);
+            removeFromAllQueues(pcb);
             try {
                 Process.terminateProcess(pcb, memory, this);
             } catch (Exception e) {
@@ -426,19 +465,12 @@ public class Scheduler {
         }
 
         if (pcb.status.equals("Blocked")) {
-            blockedQueue.add(pcb);
+            enqueueBlocked(pcb);
             return;
         }
 
         pcb.status = "Ready";
-        pcb.lastReadyEnqueueTime = time;  // Update when process is re-queued
-
-        switch (pcb.currentQueueLevel) {
-            case 0: q0.add(pcb); break;
-            case 1: q1.add(pcb); break;
-            case 2: q2.add(pcb); break;
-            case 3: q3.add(pcb); break;
-        }
+        enqueueMLFQ(pcb);
     }
 
     /**
@@ -451,9 +483,12 @@ public class Scheduler {
             PCB p1 = createProcessWithSwap("Program1.txt", memory);
             if (p1 != null) {
                 p1.arrivalTime = time;
-                p1.lastReadyEnqueueTime = time;  // Set ready queue enqueue time
-                readyQueue.add(p1);  // First process, add normally
-                q0.add(p1);
+                p1.currentQueueLevel = 0;
+                if ("MLFQ".equalsIgnoreCase(algorithm)) {
+                    enqueueMLFQ(p1);
+                } else {
+                    enqueueReady(p1);
+                }
                 System.out.println(">>> Process 1 arrived at time " + time);
             }
         }
@@ -462,11 +497,15 @@ public class Scheduler {
             PCB p2 = createProcessWithSwap("Program2.txt", memory);
             if (p2 != null) {
                 p2.arrivalTime = time;
-                p2.lastReadyEnqueueTime = time;  // Set ready queue enqueue time
-                // RR fairness: Add newly arrived processes to the FRONT so they get a turn
-                // before any process gets a second turn
-                readyQueue.addFirst(p2);
-                q0.add(p2);
+                p2.currentQueueLevel = 0;
+                if ("MLFQ".equalsIgnoreCase(algorithm)) {
+                    enqueueMLFQ(p2);
+                } else if ("RR".equalsIgnoreCase(algorithm)) {
+                    // RR fairness: newly arrived process should get first turn before second turns.
+                    enqueueReadyFront(p2);
+                } else {
+                    enqueueReady(p2);
+                }
                 System.out.println(">>> Process 2 arrived at time " + time);
             }
         }
@@ -475,13 +514,75 @@ public class Scheduler {
             PCB p3 = createProcessWithSwap("Program3.txt", memory);
             if (p3 != null) {
                 p3.arrivalTime = time;
-                p3.lastReadyEnqueueTime = time;  // Set ready queue enqueue time
-                // RR fairness: Add newly arrived processes to the FRONT so they get a turn
-                // before any process gets a second turn
-                readyQueue.addFirst(p3);
-                q0.add(p3);
+                p3.currentQueueLevel = 0;
+                if ("MLFQ".equalsIgnoreCase(algorithm)) {
+                    enqueueMLFQ(p3);
+                } else if ("RR".equalsIgnoreCase(algorithm)) {
+                    enqueueReadyFront(p3);
+                } else {
+                    enqueueReady(p3);
+                }
                 System.out.println(">>> Process 3 arrived at time " + time);
             }
+        }
+    }
+
+    /**
+     * Remove a process from all scheduler queues to guarantee duplicate-safe transitions.
+     */
+    public void removeFromAllQueues(PCB pcb) {
+        readyQueue.remove(pcb);
+        blockedQueue.remove(pcb);
+        q0.remove(pcb);
+        q1.remove(pcb);
+        q2.remove(pcb);
+        q3.remove(pcb);
+    }
+
+    /**
+     * Enqueue process into blocked queue after removing stale queue membership.
+     */
+    public void enqueueBlocked(PCB pcb) {
+        removeFromAllQueues(pcb);
+        pcb.status = "Blocked";
+        blockedQueue.add(pcb);
+    }
+
+    /**
+     * Enqueue process in generic ready queue (RR/HRRN).
+     */
+    public void enqueueReady(PCB pcb) {
+        removeFromAllQueues(pcb);
+        pcb.status = "Ready";
+        pcb.lastReadyEnqueueTime = time;
+        readyQueue.addLast(pcb);
+    }
+
+    /**
+     * Enqueue process at front of ready queue (RR fairness for newly arrived tasks).
+     */
+    public void enqueueReadyFront(PCB pcb) {
+        removeFromAllQueues(pcb);
+        pcb.status = "Ready";
+        pcb.lastReadyEnqueueTime = time;
+        readyQueue.addFirst(pcb);
+    }
+
+    /**
+     * Enqueue process into the current MLFQ level as the canonical ready-state location.
+     */
+    public void enqueueMLFQ(PCB pcb) {
+        removeFromAllQueues(pcb);
+        pcb.status = "Ready";
+        pcb.lastReadyEnqueueTime = time;
+        switch (pcb.currentQueueLevel) {
+            case 0: q0.addLast(pcb); break;
+            case 1: q1.addLast(pcb); break;
+            case 2: q2.addLast(pcb); break;
+            case 3: q3.addLast(pcb); break;
+            default:
+                pcb.currentQueueLevel = 3;
+                q3.addLast(pcb);
         }
     }
     /**
@@ -533,6 +634,13 @@ public class Scheduler {
      * @return PCB to swap out, or null if none available
      */
     private PCB findProcessToSwap() {
+        if ("MLFQ".equalsIgnoreCase(algorithm)) {
+            if (!q0.isEmpty()) return q0.getFirst();
+            if (!q1.isEmpty()) return q1.getFirst();
+            if (!q2.isEmpty()) return q2.getFirst();
+            if (!q3.isEmpty()) return q3.getFirst();
+        }
+
         // Try to swap a ready process (not currently running)
         if (!readyQueue.isEmpty()) {
             // Prefer the process that has been waiting longest
@@ -575,18 +683,20 @@ public class Scheduler {
      * Used by SimulationEngine for single-step mode
      */
     public PCB selectNextProcess() {
-        if (readyQueue.isEmpty()) {
-            return null;
-        }
-        
-        PCB selected = null;
-        
+        PCB selected;
+
         switch (algorithm.toUpperCase()) {
             case "RR":
+                if (readyQueue.isEmpty()) {
+                    return null;
+                }
                 selected = readyQueue.peek(); // Peek without removing
                 break;
                 
             case "HRRN":
+                if (readyQueue.isEmpty()) {
+                    return null;
+                }
                 selected = selectHRRN();
                 break;
                 
@@ -595,6 +705,9 @@ public class Scheduler {
                 break;
                 
             default:
+                if (readyQueue.isEmpty()) {
+                    return null;
+                }
                 selected = readyQueue.peek();
         }
         

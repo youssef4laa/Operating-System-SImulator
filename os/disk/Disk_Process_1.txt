@@ -1,0 +1,37 @@
+1
+Ready
+1
+1
+12
+0
+16
+12
+semWait userInput
+assign x input
+assign y input
+semSignal userInput
+semWait userOutput
+print x
+print y
+printFromTo x y
+print y
+print x
+printFromTo y x
+semSignal userOutput
+0
+os.PCB@6efd86b2
+semWait userInput
+assign x input
+assign y input
+semSignal userInput
+semWait userOutput
+print x
+print y
+printFromTo x y
+print y
+print x
+printFromTo y x
+semSignal userOutput
+null
+null
+null

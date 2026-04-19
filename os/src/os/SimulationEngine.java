@@ -47,6 +47,7 @@ public class SimulationEngine {
     public SimulationEngine(DebugConsole debugConsole) {
         this.memory = new Memory();
         this.scheduler = new Scheduler();
+        this.scheduler.setMemory(this.memory);
         this.debugConsole = debugConsole;
         this.fileProgramQueue = new ArrayList<>();
         
@@ -111,6 +112,7 @@ public class SimulationEngine {
     public void initialize(String algorithm) {
         try {
             scheduler.algorithm = algorithm;
+            scheduler.setMemory(memory);
             clockCycle = 0;
             instructionsExecuted = 0;
             nextArrivalIndex = 0;
@@ -212,6 +214,7 @@ public class SimulationEngine {
         }
 
         scheduler.setTime(clockCycle);
+        scheduler.setMemory(memory);
 
         // Schedule and execute according to selected algorithm
         try {
@@ -219,12 +222,37 @@ public class SimulationEngine {
                 executeRRQuantumStep();
             } else if ("HRRN".equalsIgnoreCase(scheduler.algorithm)) {
                 executeHRRNStep();
+            } else if ("MLFQ".equalsIgnoreCase(scheduler.algorithm)) {
+                executeMLFQQuantumStep();
             } else {
                 executeSingleInstructionStep();
             }
         } catch (Exception e) {
             debugConsole.log("Scheduler cycle error: " + e.getMessage(), true);
         }
+    }
+
+    /**
+     * GUI step mode for MLFQ: execute one selected process for its MLFQ quantum.
+     */
+    private void executeMLFQQuantumStep() throws Exception {
+        PCB nextPCB = scheduler.MLFQ();
+        if (nextPCB == null) {
+            return;
+        }
+
+        SchedulingEvent selectedEvent = new SchedulingEvent(
+            SchedulingEvent.EventType.PROCESS_SELECTED,
+            clockCycle,
+            nextPCB
+        );
+        selectedEvent.eventDetails = "Selected via MLFQ";
+        scheduler.emitSchedulingEvent(selectedEvent);
+
+        int beforePointer = nextPCB.instructionPointer;
+        scheduler.runMLFQ(nextPCB, memory);
+        int executedThisSlice = Math.max(0, nextPCB.instructionPointer - beforePointer);
+        instructionsExecuted += executedThisSlice;
     }
 
     /**
@@ -581,10 +609,14 @@ public class SimulationEngine {
             if (processIdx < fileProgramQueue.size()) {
                 FileProgram fileProgram = fileProgramQueue.get(processIdx);
                 pcb.arrivalTime = fileProgram.arrivalTime;
-                pcb.lastReadyEnqueueTime = clockCycle;  // Set when process enters ready queue
             }
             
-            scheduler.readyQueue.add(pcb);
+            if ("MLFQ".equalsIgnoreCase(scheduler.algorithm)) {
+                pcb.currentQueueLevel = 0;
+                scheduler.enqueueMLFQ(pcb);
+            } else {
+                scheduler.enqueueReady(pcb);
+            }
             
             debugConsole.log("  -> Process P" + pcb.processID + " created successfully");
             
@@ -620,6 +652,7 @@ public class SimulationEngine {
     public void reset() {
         memory = new Memory();
         scheduler = new Scheduler();
+        scheduler.setMemory(memory);
         MemoryManager.resetState();
         Process.resetIdCounter();
         

@@ -270,7 +270,7 @@ public class OSSimulatorGUI extends JFrame {
         // Ready Queue
         JLabel readyLabel = new JLabel("Ready Queue");
         readyLabel.setFont(new Font("Arial", Font.BOLD, 11));
-        readyQueuePanel = new QueueVisualization("Ready", engine.getScheduler().readyQueue);
+        readyQueuePanel = new QueueVisualization("Ready", engine.getScheduler().getReadyQueue());
         
         panel.add(readyLabel);
         panel.add(readyQueuePanel);
@@ -574,8 +574,8 @@ public class OSSimulatorGUI extends JFrame {
         SwingUtilities.invokeLater(() -> {
             mutexPanel.setMutexManager(engine.getMutexManager());
             memoryPanel.update(engine.getMemory());
-            readyQueuePanel.update(engine.getScheduler().readyQueue);
-            blockedQueuePanel.update(engine.getScheduler().blockedQueue);
+            readyQueuePanel.update(engine.getScheduler().getReadyQueue(), engine.getScheduler().algorithm);
+            blockedQueuePanel.update(engine.getScheduler().blockedQueue, engine.getScheduler().algorithm);
             currentProcessPanel.update(engine.getScheduler());
             mutexPanel.update();
             statsPanel.update();

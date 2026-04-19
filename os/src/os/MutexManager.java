@@ -193,6 +193,54 @@ public class MutexManager {
 	}
 	
 	/**
+	 * MLFQ SUPPORT: Configure priority inheritance for all mutexes
+	 * When enabled, processes with higher priority blocked on a mutex will boost the owner process
+	 * @param enable true to enable priority inheritance
+	 */
+	public void configureMLFQPriorityInheritance(boolean enable) {
+		mutexUserOutput.setPriorityInheritance(enable);
+		mutexUserInput.setPriorityInheritance(enable);
+		mutexFile.setPriorityInheritance(enable);
+		logInfo("MLFQ Priority Inheritance: " + (enable ? "ENABLED" : "DISABLED"));
+	}
+	
+	/**
+	 * MLFQ SUPPORT: Configure priority boost for all mutexes
+	 * When enabled, processes unblocked from a mutex are temporarily boosted to a higher priority queue
+	 * @param enable true to enable priority boost
+	 */
+	public void configureMLFQPriorityBoost(boolean enable) {
+		mutexUserOutput.setPriorityBoost(enable);
+		mutexUserInput.setPriorityBoost(enable);
+		mutexFile.setPriorityBoost(enable);
+		logInfo("MLFQ Priority Boost: " + (enable ? "ENABLED" : "DISABLED"));
+	}
+	
+	/**
+	 * MLFQ SUPPORT: Set the queue level to boost unblocked processes to
+	 * @param level The MLFQ queue level (0-3, where 0 is highest priority)
+	 */
+	public void configureMLFQBoostLevel(int level) {
+		mutexUserOutput.setBoostLevel(level);
+		mutexUserInput.setBoostLevel(level);
+		mutexFile.setBoostLevel(level);
+		logInfo("MLFQ Boost Level set to Q" + level);
+	}
+	
+	/**
+	 * MLFQ SUPPORT: Get detailed MLFQ status for all mutexes
+	 */
+	public String getMLFQStatus() {
+		StringBuilder sb = new StringBuilder();
+		sb.append("\n========== MLFQ MUTEX STATUS ==========\n");
+		sb.append(mutexUserOutput.getMLFQStatus()).append("\n");
+		sb.append(mutexUserInput.getMLFQStatus()).append("\n");
+		sb.append(mutexFile.getMLFQStatus()).append("\n");
+		sb.append("=======================================\n");
+		return sb.toString();
+	}
+	
+	/**
 	 * Log information message
 	 */
 	private void logInfo(String message) {
