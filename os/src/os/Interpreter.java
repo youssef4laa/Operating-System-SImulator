@@ -67,8 +67,7 @@ public class Interpreter {
                 return;
             }
             
-            // Log execution
-            System.out.println("Process " + pcb.processID + " executing: " + instruction);
+            // Note: Instruction execution is already logged in SimulationEngine via debugConsole
             
             // Track status before execution
             String statusBefore = pcb.status;
@@ -84,7 +83,7 @@ public class Interpreter {
                 // Process was blocked (e.g., waiting for mutex)
                 // Decrement instruction pointer to retry this instruction
                 pcb.retryInstruction();
-                System.out.println("Process " + pcb.processID + " blocked on instruction: " + instruction);
+                // Note: Blocking is already logged in SimulationEngine and Mutex
             } else if (!pcb.status.equals("Terminated")) {
                 // Instruction completed successfully AND process not terminated, advance program counter
                 pcb.programCounter++;

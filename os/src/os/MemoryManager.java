@@ -131,7 +131,7 @@ public class MemoryManager {
         for (int i = minBound; i <= maxBound; i++) {
             memory.write(i, null);
         }
-        System.out.println("Memory deallocated: addresses " + minBound + "-" + maxBound);
+        // Note: Memory deallocation is logged at higher level (SimulationEngine)
     }
     
     /**

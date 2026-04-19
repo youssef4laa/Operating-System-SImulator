@@ -49,19 +49,13 @@ public class Mutex {
 				p.ownedMutexes.add(this);
 			}
 			acquireCount++;
-			if (!suppressLogging) {
-				System.out.println("  [MUTEX] Process " + p.processID + " acquired mutex '" + 
-					resourceName + "' (count: " + acquireCount + ")");
-			}
-			return true;  // Process continues without blocking
-			
+		// Note: Mutex acquire is logged at higher level when needed
+		return true;  // Process continues without blocking
+		
 		} else if (owner == p) {
 			// Same process trying to re-acquire - for now, we don't allow recursive locks
 			// (non-reentrant mutex). If we need reentrant, count acquisitions
-			if (!suppressLogging) {
-				System.out.println("  [MUTEX] WARNING: Process " + p.processID + 
-					" attempted to re-acquire mutex '" + resourceName + "' (already owns it)");
-			}
+		// Note: Re-acquire warning is logged at higher level when needed
 			return true;  // Allow immediate return without blocking
 			
 		} else {
@@ -77,11 +71,7 @@ public class Mutex {
 				);
 				event.eventDetails = "Blocked on mutex '" + resourceName + "' owned by P" + owner.processID;
 				scheduler.emitSchedulingEvent(event);
-				if (!suppressLogging) {
-					System.out.println("  [MUTEX] Process " + p.processID + " blocked on mutex '" + 
-						resourceName + "' (waiting for process " + owner.processID + ")");
-					System.out.println("  [MUTEX] Wait queue size: " + waitQueue.size());
-				}
+			// Note: Blocking is logged at higher level
 			}
 			return false;  // Process is blocked
 		}
@@ -130,11 +120,7 @@ public class Mutex {
 				);
 				event.eventDetails = "Unblocked from mutex '" + resourceName + "' and moved to ready queue";
 				scheduler.emitSchedulingEvent(event);
-				if (!suppressLogging) {
-					System.out.println("  [MUTEX] Released to Process " + nextProcess.processID + 
-						" from mutex '" + resourceName + "' (next in queue)");
-					System.out.println("  [MUTEX] Wait queue size: " + waitQueue.size());
-				}
+			// Note: Release is logged at higher level
 			} else {
 				System.err.println("  [MUTEX ERROR] Could not find released process in blocked queue");
 			}
@@ -143,9 +129,7 @@ public class Mutex {
 			releasingOwner.ownedMutexes.remove(this);
 			isLocked = false;
 			owner = null;
-			if (!suppressLogging) {
-				System.out.println("  [MUTEX] Mutex '" + resourceName + "' is now unlocked");
-			}
+			// Note: Mutex unlock is logged at higher level when needed
 		}
 	}
 	

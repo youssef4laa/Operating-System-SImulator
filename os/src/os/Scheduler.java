@@ -144,7 +144,7 @@ public class Scheduler {
         int iteration = 0;
         
         while (iteration < maxIterations) {
-            // Check for new process arrivals
+            // Check for new process arrivals at the START of this time unit
             checkArrivals(time, memory);
             
             // Check termination: all queues empty
@@ -245,18 +245,37 @@ public class Scheduler {
     public void RR(PCB pcb, Memory memory) throws Exception {
         int quantum = 2; // 2 instructions per slice
         pcb.status = "Running";
+        pcb.quantumUsed = 0;  // Track quantum usage
         
-        int counter = 0;
-        
-        while (counter < quantum && pcb.status.equals("Running")) {
+        while (pcb.quantumUsed < quantum && pcb.status.equals("Running")) {
+            // Guard: Check if there are instructions left to execute
+            if (pcb.instructionPointer >= pcb.instructionList.size()) {
+                pcb.status = "Finished";
+                break;
+            }
+            
+            // Execute one instruction
             Interpreter.execute(pcb, memory);
-            counter++;
+            pcb.quantumUsed++;
 
-            if (pcb.programCounter > pcb.maxBound || pcb.status.equals("Finished")) {
+            // Check if process terminated with fatal error
+            if (pcb.status.equals("Terminated")) {
                 break;
             }
 
+            // Check if process blocked on resource
             if (pcb.status.equals("Blocked")) {
+                break;
+            }
+
+            // Check if process finished (all instructions executed)
+            if (pcb.status.equals("Finished")) {
+                break;
+            }
+            
+            // Check if we've gone beyond instruction bounds
+            if (pcb.instructionPointer >= pcb.instructionList.size()) {
+                pcb.status = "Finished";
                 break;
             }
         }
@@ -429,7 +448,7 @@ public class Scheduler {
             PCB p1 = createProcessWithSwap("Program1.txt", memory);
             if (p1 != null) {
                 p1.arrivalTime = time;
-                readyQueue.add(p1);
+                readyQueue.add(p1);  // First process, add normally
                 q0.add(p1);
                 System.out.println(">>> Process 1 arrived at time " + time);
             }
@@ -439,7 +458,9 @@ public class Scheduler {
             PCB p2 = createProcessWithSwap("Program2.txt", memory);
             if (p2 != null) {
                 p2.arrivalTime = time;
-                readyQueue.add(p2);
+                // RR fairness: Add newly arrived processes to the FRONT so they get a turn
+                // before any process gets a second turn
+                readyQueue.addFirst(p2);
                 q0.add(p2);
                 System.out.println(">>> Process 2 arrived at time " + time);
             }
@@ -449,7 +470,9 @@ public class Scheduler {
             PCB p3 = createProcessWithSwap("Program3.txt", memory);
             if (p3 != null) {
                 p3.arrivalTime = time;
-                readyQueue.add(p3);
+                // RR fairness: Add newly arrived processes to the FRONT so they get a turn
+                // before any process gets a second turn
+                readyQueue.addFirst(p3);
                 q0.add(p3);
                 System.out.println(">>> Process 3 arrived at time " + time);
             }

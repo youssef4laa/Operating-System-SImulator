@@ -186,7 +186,6 @@ public class SystemCall {
             
             stats.recordCall("writeFile", SUCCESS);
             logInfo("writeFile: wrote " + data.length() + " bytes to '" + filename + "'");
-            System.out.println("[SYSCALL] File written: " + filename);
             return SUCCESS;
         } catch (IOException e) {
             logError("writeFile: " + e.getMessage());

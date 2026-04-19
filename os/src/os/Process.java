@@ -91,10 +91,6 @@ public class Process {
             // Track allocation
             MemoryManager.trackAllocation(pcb.processID, pcb.minBound, pcb.maxBound);
             
-            System.out.println("Process " + pcb.processID + " created: instructions=" + 
-                             instructions.size() + ", memory=" + start + "-" + pcb.maxBound + 
-                             " (" + pcb.allocationSize + " words)");
-            
             return pcb;
             
         } catch (Exception e) {
@@ -121,7 +117,6 @@ public class Process {
             MemoryManager.deallocateBlock(pcb.minBound, pcb.maxBound, memory);
             MemoryManager.untrackAllocation(pcb.processID);
             pcb.status = "Finished";
-            System.out.println("Process " + pcb.processID + " terminated, memory deallocated");
         } catch (Exception e) {
             e.printStackTrace();
             throw e;
