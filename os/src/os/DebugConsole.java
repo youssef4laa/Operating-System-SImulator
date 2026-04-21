@@ -28,28 +28,39 @@ public class DebugConsole extends JPanel {
     public DebugConsole() {
         this.setLayout(new BorderLayout(5, 5));
         this.setBorder(BorderFactory.createLineBorder(new Color(221, 221, 221), 1));
+        this.setBackground(new Color(245, 245, 245));
         
         // Title
         JLabel titleLabel = new JLabel("Debug Console");
-        titleLabel.setFont(new Font("Arial", Font.BOLD, 12));
-        titleLabel.setBackground(new Color(250, 250, 250));
+        titleLabel.setFont(new Font("Arial", Font.BOLD, 14));
+        titleLabel.setForeground(new Color(33, 33, 33));
+        titleLabel.setBackground(new Color(238, 238, 238));
         titleLabel.setOpaque(true);
-        titleLabel.setBorder(BorderFactory.createEmptyBorder(5, 5, 5, 5));
+        titleLabel.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createMatteBorder(0, 0, 1, 0, new Color(210, 210, 210)),
+            BorderFactory.createEmptyBorder(7, 8, 7, 8)
+        ));
         this.add(titleLabel, BorderLayout.NORTH);
         
         // Console output with JTextPane for styling
         consoleOutput = new JTextPane();
         consoleOutput.setEditable(false);
-        consoleOutput.setFont(new Font("Courier New", Font.PLAIN, 9));
-        consoleOutput.setBackground(new Color(30, 30, 30));
+        consoleOutput.setFont(new Font("Consolas", Font.PLAIN, 12));
+        consoleOutput.setBackground(new Color(18, 18, 18));
+        consoleOutput.setForeground(new Color(144, 238, 144));
+        consoleOutput.setBorder(BorderFactory.createEmptyBorder(6, 8, 6, 8));
         consoleOutput.setText("System ready. Waiting for execution...\n");
         
         // Setup text styles
         normalStyle = new SimpleAttributeSet();
-        StyleConstants.setForeground(normalStyle, new Color(0, 255, 0));
+        StyleConstants.setForeground(normalStyle, new Color(157, 255, 157));
+        StyleConstants.setFontFamily(normalStyle, "Consolas");
+        StyleConstants.setFontSize(normalStyle, 12);
         
         errorStyle = new SimpleAttributeSet();
-        StyleConstants.setForeground(errorStyle, new Color(255, 100, 100));
+        StyleConstants.setForeground(errorStyle, new Color(255, 138, 128));
+        StyleConstants.setFontFamily(errorStyle, "Consolas");
+        StyleConstants.setFontSize(errorStyle, 12);
         
         // Style the initial text
         StyledDocument doc = consoleOutput.getStyledDocument();

@@ -12,8 +12,8 @@ public class MemoryVisualization extends JPanel {
     private Memory memory;
     private static final int GRID_COLS = 8;
     private static final int GRID_ROWS = 5;
-    private static final int CELL_WIDTH = 60;
-    private static final int CELL_HEIGHT = 40;
+    private static final int CELL_WIDTH = 56;
+    private static final int CELL_HEIGHT = 44;
     private static final int CELL_PADDING = 3;
     
     // Color constants
@@ -78,14 +78,31 @@ public class MemoryVisualization extends JPanel {
         g2d.setStroke(new BasicStroke(cell.borderWidth));
         g2d.drawRect(cell.x, cell.y, cell.width, cell.height);
         
-        // Draw text
+        // Draw text as two compact lines for readability
         g2d.setColor(Color.BLACK);
-        g2d.setFont(new Font("Arial", Font.PLAIN, 9));
-        FontMetrics fm = g2d.getFontMetrics();
-        String text = "[" + cell.address + "]: " + cell.content;
-        int textX = cell.x + (cell.width - fm.stringWidth(text)) / 2;
-        int textY = cell.y + ((cell.height - fm.getHeight()) / 2) + fm.getAscent();
-        g2d.drawString(text, textX, textY);
+        g2d.setFont(new Font("Arial", Font.BOLD, 9));
+        FontMetrics headerFm = g2d.getFontMetrics();
+        String addressText = "[" + cell.address + "]";
+        int addressX = cell.x + (cell.width - headerFm.stringWidth(addressText)) / 2;
+        int addressY = cell.y + 14;
+        g2d.drawString(addressText, addressX, addressY);
+
+        g2d.setFont(new Font("Arial", Font.PLAIN, 8));
+        FontMetrics contentFm = g2d.getFontMetrics();
+        String contentText = truncateForCell(cell.content, 8);
+        int contentX = cell.x + (cell.width - contentFm.stringWidth(contentText)) / 2;
+        int contentY = cell.y + 29;
+        g2d.drawString(contentText, contentX, contentY);
+    }
+
+    private String truncateForCell(String text, int maxLen) {
+        if (text == null) {
+            return "";
+        }
+        if (text.length() <= maxLen) {
+            return text;
+        }
+        return text.substring(0, Math.max(0, maxLen - 3)) + "...";
     }
     
     /**

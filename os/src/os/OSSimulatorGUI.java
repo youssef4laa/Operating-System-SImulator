@@ -217,7 +217,7 @@ public class OSSimulatorGUI extends JFrame {
      */
     private JSplitPane createCenterContent() {
         JSplitPane mainSplit = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT);
-        mainSplit.setResizeWeight(0.0);
+        mainSplit.setResizeWeight(0.34);
         
         // Left: Memory and Queues
         JPanel leftPanel = createLeftPanel();
@@ -234,8 +234,8 @@ public class OSSimulatorGUI extends JFrame {
         rightSplit.setRightComponent(debugPanel);
         
         mainSplit.setRightComponent(rightSplit);
-        mainSplit.setDividerLocation(300);
-        rightSplit.setDividerLocation(650);
+        mainSplit.setDividerLocation(520);
+        rightSplit.setDividerLocation(760);
         
         return mainSplit;
     }
@@ -247,7 +247,7 @@ public class OSSimulatorGUI extends JFrame {
         JPanel panel = new JPanel();
         panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
         panel.setBorder(BorderFactory.createLineBorder(new Color(221, 221, 221), 1));
-        panel.setPreferredSize(new Dimension(300, 0));
+        panel.setPreferredSize(new Dimension(520, 0));
         
         JLabel sectionLabel = new JLabel("System State");
         sectionLabel.setFont(new Font("Arial", Font.BOLD, 13));
@@ -260,8 +260,9 @@ public class OSSimulatorGUI extends JFrame {
         memoryPanel = new MemoryVisualization(engine.getMemory());
         
         JScrollPane memScroll = new JScrollPane(memoryPanel);
-        memScroll.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED);
-        memScroll.setPreferredSize(new Dimension(0, 180));
+        memScroll.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_NEVER);
+        memScroll.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+        memScroll.setPreferredSize(new Dimension(500, 270));
         
         panel.add(memoryLabel);
         panel.add(memScroll);
@@ -330,7 +331,7 @@ public class OSSimulatorGUI extends JFrame {
         panel.setBorder(BorderFactory.createLineBorder(new Color(221, 221, 221), 1));
         
         // Add debug console
-        debugConsole.setPreferredSize(new Dimension(0, 350));
+        debugConsole.setPreferredSize(new Dimension(0, 470));
         panel.add(debugConsole, BorderLayout.CENTER);
         
         // Control buttons
@@ -574,6 +575,9 @@ public class OSSimulatorGUI extends JFrame {
         SwingUtilities.invokeLater(() -> {
             mutexPanel.setMutexManager(engine.getMutexManager());
             memoryPanel.update(engine.getMemory());
+            Scheduler scheduler = engine.getScheduler();
+            boolean isMLFQ = "MLFQ".equalsIgnoreCase(scheduler.algorithm);
+            readyQueuePanel.setMLFQMode(isMLFQ, scheduler.q0, scheduler.q1, scheduler.q2, scheduler.q3);
             readyQueuePanel.update(engine.getScheduler().getReadyQueue(), engine.getScheduler().algorithm);
             blockedQueuePanel.update(engine.getScheduler().blockedQueue, engine.getScheduler().algorithm);
             currentProcessPanel.update(engine.getScheduler());

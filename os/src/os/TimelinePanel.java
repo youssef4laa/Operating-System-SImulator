@@ -16,6 +16,7 @@ public class TimelinePanel extends JPanel {
     private JLabel blockedCountLabel;
     private JLabel finishedCountLabel;
     private JTextArea timelineLog;
+    private JPanel clockHighlightPanel;
     
     public TimelinePanel() {
         this.setLayout(new BorderLayout(10, 10));
@@ -32,24 +33,35 @@ public class TimelinePanel extends JPanel {
         
         // Title
         JLabel titleLabel = new JLabel("Execution Timeline");
-        titleLabel.setFont(new Font("Arial", Font.BOLD, 12));
+        titleLabel.setFont(new Font("Arial", Font.BOLD, 13));
         contentPanel.add(titleLabel);
         contentPanel.add(Box.createVerticalStrut(5));
+
+        // Clock cycle highlight (kept separate so the most important metric is prominent)
+        clockHighlightPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 12, 8));
+        clockHighlightPanel.setBackground(new Color(255, 245, 230));
+        clockHighlightPanel.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createLineBorder(new Color(255, 140, 0), 2),
+            BorderFactory.createEmptyBorder(2, 6, 2, 6)
+        ));
+
+        JLabel clockLabel = new JLabel("Clock Cycle");
+        clockLabel.setFont(new Font("Arial", Font.BOLD, 12));
+        clockLabel.setForeground(new Color(153, 51, 0));
+        clockCycleLabel = new JLabel("0");
+        clockCycleLabel.setFont(new Font("Arial", Font.BOLD, 22));
+        clockCycleLabel.setForeground(new Color(204, 51, 0));
+
+        clockHighlightPanel.add(clockLabel);
+        clockHighlightPanel.add(clockCycleLabel);
+        contentPanel.add(clockHighlightPanel);
+        contentPanel.add(Box.createVerticalStrut(8));
         
         // Stats grid
         JPanel statsGrid = new JPanel();
-        statsGrid.setLayout(new GridLayout(2, 6, 20, 10));
+        statsGrid.setLayout(new GridLayout(2, 5, 16, 10));
         statsGrid.setBackground(Color.WHITE);
         statsGrid.setBorder(BorderFactory.createLineBorder(new Color(238, 238, 238), 1));
-        
-        // Clock Cycle
-        JLabel clockLabel = new JLabel("Clock Cycle:");
-        clockLabel.setFont(new Font("Arial", Font.BOLD, 10));
-        clockCycleLabel = new JLabel("0");
-        clockCycleLabel.setFont(new Font("Arial", Font.PLAIN, 12));
-        clockCycleLabel.setForeground(new Color(0, 102, 204));
-        statsGrid.add(clockLabel);
-        statsGrid.add(clockCycleLabel);
         
         // Instructions executed
         JLabel instLabel = new JLabel("Instructions:");
