@@ -40,6 +40,8 @@ public class OSSimulatorGUI extends JFrame {
     private ButtonGroup modeGroup;
     private JSlider speedSlider;
     private JLabel speedValue;
+    private JButton darkModeButton;
+    private boolean darkModeEnabled = false;
     
     // Execution state
     private boolean executionPaused = true;
@@ -141,10 +143,21 @@ public class OSSimulatorGUI extends JFrame {
         header.setLayout(new BoxLayout(header, BoxLayout.Y_AXIS));
         header.setBorder(BorderFactory.createMatteBorder(0, 0, 2, 0, new Color(204, 204, 204)));
         header.add(Box.createVerticalStrut(10));
-        
+
+        JPanel titleRow = new JPanel(new BorderLayout());
+        titleRow.setOpaque(false);
+
         JLabel titleLabel = new JLabel("Operating System Simulator - CSEN 602 (Spring 2026)");
         titleLabel.setFont(new Font("Arial", Font.BOLD, 18));
-        header.add(titleLabel);
+        titleRow.add(titleLabel, BorderLayout.WEST);
+
+        darkModeButton = new JButton("Dark Mode");
+        darkModeButton.setFont(new Font("Arial", Font.BOLD, 11));
+        darkModeButton.setFocusable(false);
+        darkModeButton.addActionListener(e -> toggleDarkMode());
+        titleRow.add(darkModeButton, BorderLayout.EAST);
+
+        header.add(titleRow);
         
         header.add(Box.createVerticalStrut(10));
         
@@ -628,6 +641,110 @@ public class OSSimulatorGUI extends JFrame {
         pauseExecution();
         debugConsole.restore();
         System.exit(0);
+    }
+
+    /**
+     * Toggle navy dark mode for the entire UI.
+     */
+    private void toggleDarkMode() {
+        darkModeEnabled = !darkModeEnabled;
+        applyThemeRecursively(this.getContentPane(), darkModeEnabled);
+        timelinePanel.setDarkMode(darkModeEnabled);
+        debugConsole.setDarkMode(darkModeEnabled);
+        darkModeButton.setText(darkModeEnabled ? "Light Mode" : "Dark Mode");
+        updateStatusLabel(statusLabel.getText());
+        SwingUtilities.updateComponentTreeUI(this);
+        this.repaint();
+    }
+
+    /**
+     * Apply base palette to Swing components recursively.
+     */
+    private void applyThemeRecursively(Component component, boolean darkMode) {
+        Color panelBg = darkMode ? new Color(13, 27, 42) : new Color(245, 245, 245);
+        Color cardBg = darkMode ? new Color(22, 41, 74) : Color.WHITE;
+        Color textColor = darkMode ? new Color(224, 236, 255) : new Color(33, 33, 33);
+        Color borderColor = darkMode ? new Color(39, 59, 99) : new Color(210, 210, 210);
+        Color buttonBg = darkMode ? new Color(31, 58, 94) : new Color(238, 238, 238);
+
+        if (component instanceof JPanel) {
+            JPanel panel = (JPanel) component;
+            if (panel.isOpaque()) {
+                panel.setBackground(panelBg);
+            }
+            if (panel.getBorder() instanceof javax.swing.border.LineBorder) {
+                panel.setBorder(BorderFactory.createLineBorder(borderColor, 1));
+            }
+        }
+
+        if (component instanceof JTabbedPane) {
+            JTabbedPane tabs = (JTabbedPane) component;
+            tabs.setBackground(darkMode ? new Color(16, 34, 58) : new Color(245, 245, 245));
+            tabs.setForeground(textColor);
+        }
+
+        if (component instanceof JLabel) {
+            JLabel label = (JLabel) component;
+            label.setForeground(textColor);
+        }
+
+        if (component instanceof JButton) {
+            JButton button = (JButton) component;
+            button.setBackground(buttonBg);
+            button.setForeground(textColor);
+            button.setBorder(BorderFactory.createLineBorder(borderColor, 1));
+            button.setOpaque(true);
+        }
+
+        if (component instanceof JRadioButton) {
+            JRadioButton radio = (JRadioButton) component;
+            radio.setBackground(panelBg);
+            radio.setForeground(textColor);
+        }
+
+        if (component instanceof JComboBox) {
+            JComboBox<?> combo = (JComboBox<?>) component;
+            combo.setBackground(cardBg);
+            combo.setForeground(textColor);
+        }
+
+        if (component instanceof JSlider) {
+            JSlider slider = (JSlider) component;
+            slider.setBackground(panelBg);
+            slider.setForeground(textColor);
+        }
+
+        if (component instanceof JTextArea) {
+            JTextArea textArea = (JTextArea) component;
+            textArea.setBackground(darkMode ? new Color(9, 21, 39) : Color.WHITE);
+            textArea.setForeground(darkMode ? new Color(205, 225, 255) : Color.BLACK);
+            textArea.setCaretColor(darkMode ? new Color(205, 225, 255) : Color.BLACK);
+        }
+
+        if (component instanceof JTextPane) {
+            JTextPane textPane = (JTextPane) component;
+            textPane.setBackground(darkMode ? new Color(9, 21, 39) : Color.WHITE);
+            textPane.setForeground(darkMode ? new Color(205, 225, 255) : Color.BLACK);
+            textPane.setCaretColor(darkMode ? new Color(205, 225, 255) : Color.BLACK);
+        }
+
+        if (component instanceof JScrollPane) {
+            JScrollPane scrollPane = (JScrollPane) component;
+            scrollPane.setBackground(panelBg);
+            scrollPane.getViewport().setBackground(darkMode ? new Color(9, 21, 39) : Color.WHITE);
+            scrollPane.setBorder(BorderFactory.createLineBorder(borderColor, 1));
+        }
+
+        if (component instanceof JSplitPane) {
+            JSplitPane splitPane = (JSplitPane) component;
+            splitPane.setBackground(panelBg);
+        }
+
+        if (component instanceof Container) {
+            for (Component child : ((Container) component).getComponents()) {
+                applyThemeRecursively(child, darkMode);
+            }
+        }
     }
     
     public static void main(String[] args) {

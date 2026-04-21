@@ -15,8 +15,10 @@ import java.time.format.DateTimeFormatter;
 public class DebugConsole extends JPanel {
     
     private JTextPane consoleOutput;
+    private JLabel titleLabel;
     private SimpleAttributeSet normalStyle;
     private SimpleAttributeSet errorStyle;
+    private SimpleAttributeSet clockStyle;
     private PrintStream originalOut;
     private PrintStream originalErr;
     private CustomPrintStream customOut;
@@ -24,6 +26,7 @@ public class DebugConsole extends JPanel {
     
     private static final DateTimeFormatter timeFormatter = DateTimeFormatter.ofPattern("HH:mm:ss.SSS");
     private static final int MAX_LINES = 1000;
+    private boolean darkModeEnabled = false;
     
     public DebugConsole() {
         this.setLayout(new BorderLayout(5, 5));
@@ -31,7 +34,7 @@ public class DebugConsole extends JPanel {
         this.setBackground(new Color(245, 245, 245));
         
         // Title
-        JLabel titleLabel = new JLabel("Debug Console");
+        titleLabel = new JLabel("Debug Console");
         titleLabel.setFont(new Font("Arial", Font.BOLD, 14));
         titleLabel.setForeground(new Color(33, 33, 33));
         titleLabel.setBackground(new Color(238, 238, 238));
@@ -61,6 +64,11 @@ public class DebugConsole extends JPanel {
         StyleConstants.setForeground(errorStyle, new Color(255, 138, 128));
         StyleConstants.setFontFamily(errorStyle, "Consolas");
         StyleConstants.setFontSize(errorStyle, 12);
+
+        clockStyle = new SimpleAttributeSet();
+        StyleConstants.setForeground(clockStyle, new Color(102, 178, 255));
+        StyleConstants.setFontFamily(clockStyle, "Consolas");
+        StyleConstants.setFontSize(clockStyle, 12);
         
         // Style the initial text
         StyledDocument doc = consoleOutput.getStyledDocument();
@@ -98,7 +106,16 @@ public class DebugConsole extends JPanel {
                 String fullMessage = prefix + message + "\n";
                 
                 StyledDocument doc = consoleOutput.getStyledDocument();
-                doc.insertString(doc.getLength(), fullMessage, isError ? errorStyle : normalStyle);
+                SimpleAttributeSet styleToUse;
+                if (isError) {
+                    styleToUse = errorStyle;
+                } else if (message.contains("[Clock ") || message.contains("[CLOCK CYCLE]")) {
+                    styleToUse = clockStyle;
+                } else {
+                    styleToUse = normalStyle;
+                }
+
+                doc.insertString(doc.getLength(), fullMessage, styleToUse);
                 
                 // Limit console size
                 int lineCount = consoleOutput.getText().split("\n").length;
@@ -123,6 +140,50 @@ public class DebugConsole extends JPanel {
      */
     public void clear() {
         SwingUtilities.invokeLater(() -> consoleOutput.setText(""));
+    }
+
+    /**
+     * Toggle dark mode visuals for the debug console.
+     */
+    public void setDarkMode(boolean enabled) {
+        this.darkModeEnabled = enabled;
+
+        if (enabled) {
+            this.setBackground(new Color(13, 27, 42));
+            this.setBorder(BorderFactory.createLineBorder(new Color(39, 59, 99), 1));
+            titleLabel.setForeground(new Color(224, 236, 255));
+            titleLabel.setBackground(new Color(22, 41, 74));
+            titleLabel.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createMatteBorder(0, 0, 1, 0, new Color(39, 59, 99)),
+                BorderFactory.createEmptyBorder(7, 8, 7, 8)
+            ));
+            consoleOutput.setBackground(new Color(8, 20, 38));
+            consoleOutput.setForeground(new Color(197, 221, 255));
+            StyleConstants.setForeground(normalStyle, new Color(197, 221, 255));
+            StyleConstants.setForeground(errorStyle, new Color(255, 145, 145));
+            StyleConstants.setForeground(clockStyle, new Color(91, 167, 255));
+        } else {
+            this.setBackground(new Color(245, 245, 245));
+            this.setBorder(BorderFactory.createLineBorder(new Color(221, 221, 221), 1));
+            titleLabel.setForeground(new Color(33, 33, 33));
+            titleLabel.setBackground(new Color(238, 238, 238));
+            titleLabel.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createMatteBorder(0, 0, 1, 0, new Color(210, 210, 210)),
+                BorderFactory.createEmptyBorder(7, 8, 7, 8)
+            ));
+            consoleOutput.setBackground(new Color(18, 18, 18));
+            consoleOutput.setForeground(new Color(144, 238, 144));
+            StyleConstants.setForeground(normalStyle, new Color(157, 255, 157));
+            StyleConstants.setForeground(errorStyle, new Color(255, 138, 128));
+            StyleConstants.setForeground(clockStyle, new Color(102, 178, 255));
+        }
+
+        consoleOutput.repaint();
+        repaint();
+    }
+
+    public boolean isDarkModeEnabled() {
+        return darkModeEnabled;
     }
     
     /**

@@ -17,6 +17,11 @@ public class TimelinePanel extends JPanel {
     private JLabel finishedCountLabel;
     private JTextArea timelineLog;
     private JPanel clockHighlightPanel;
+    private JLabel clockTitleLabel;
+    private JPanel statsGrid;
+    private JScrollPane logScrollPane;
+    private JLabel titleLabel;
+    private JLabel logLabel;
     
     public TimelinePanel() {
         this.setLayout(new BorderLayout(10, 10));
@@ -32,33 +37,33 @@ public class TimelinePanel extends JPanel {
         contentPanel.setOpaque(false);
         
         // Title
-        JLabel titleLabel = new JLabel("Execution Timeline");
+        titleLabel = new JLabel("Execution Timeline");
         titleLabel.setFont(new Font("Arial", Font.BOLD, 13));
         contentPanel.add(titleLabel);
         contentPanel.add(Box.createVerticalStrut(5));
 
         // Clock cycle highlight (kept separate so the most important metric is prominent)
         clockHighlightPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 12, 8));
-        clockHighlightPanel.setBackground(new Color(255, 245, 230));
+        clockHighlightPanel.setBackground(new Color(236, 245, 255));
         clockHighlightPanel.setBorder(BorderFactory.createCompoundBorder(
-            BorderFactory.createLineBorder(new Color(255, 140, 0), 2),
+            BorderFactory.createLineBorder(new Color(0, 102, 204), 2),
             BorderFactory.createEmptyBorder(2, 6, 2, 6)
         ));
 
-        JLabel clockLabel = new JLabel("Clock Cycle");
-        clockLabel.setFont(new Font("Arial", Font.BOLD, 12));
-        clockLabel.setForeground(new Color(153, 51, 0));
+        clockTitleLabel = new JLabel("Clock Cycle");
+        clockTitleLabel.setFont(new Font("Arial", Font.BOLD, 12));
+        clockTitleLabel.setForeground(new Color(0, 71, 171));
         clockCycleLabel = new JLabel("0");
         clockCycleLabel.setFont(new Font("Arial", Font.BOLD, 22));
-        clockCycleLabel.setForeground(new Color(204, 51, 0));
+        clockCycleLabel.setForeground(new Color(0, 102, 204));
 
-        clockHighlightPanel.add(clockLabel);
+        clockHighlightPanel.add(clockTitleLabel);
         clockHighlightPanel.add(clockCycleLabel);
         contentPanel.add(clockHighlightPanel);
         contentPanel.add(Box.createVerticalStrut(8));
         
         // Stats grid
-        JPanel statsGrid = new JPanel();
+        statsGrid = new JPanel();
         statsGrid.setLayout(new GridLayout(2, 5, 16, 10));
         statsGrid.setBackground(Color.WHITE);
         statsGrid.setBorder(BorderFactory.createLineBorder(new Color(238, 238, 238), 1));
@@ -107,7 +112,7 @@ public class TimelinePanel extends JPanel {
         contentPanel.add(Box.createVerticalStrut(8));
         
         // Timeline log
-        JLabel logLabel = new JLabel("Timeline Log:");
+        logLabel = new JLabel("Timeline Log:");
         logLabel.setFont(new Font("Arial", Font.BOLD, 10));
         contentPanel.add(logLabel);
         contentPanel.add(Box.createVerticalStrut(3));
@@ -118,9 +123,9 @@ public class TimelinePanel extends JPanel {
         timelineLog.setWrapStyleWord(true);
         timelineLog.setFont(new Font("Courier New", Font.PLAIN, 9));
         timelineLog.setBackground(Color.WHITE);
-        JScrollPane scrollPane = new JScrollPane(timelineLog);
-        scrollPane.setPreferredSize(new Dimension(0, 120));
-        contentPanel.add(scrollPane);
+        logScrollPane = new JScrollPane(timelineLog);
+        logScrollPane.setPreferredSize(new Dimension(0, 120));
+        contentPanel.add(logScrollPane);
         
         this.add(contentPanel, BorderLayout.CENTER);
     }
@@ -162,5 +167,46 @@ public class TimelinePanel extends JPanel {
      */
     public void clearLog() {
         timelineLog.setText("");
+    }
+
+    /**
+     * Apply dark mode colors while preserving a blue clock emphasis.
+     */
+    public void setDarkMode(boolean enabled) {
+        if (enabled) {
+            this.setBackground(new Color(16, 34, 58));
+            this.setBorder(BorderFactory.createLineBorder(new Color(39, 59, 99), 1));
+            titleLabel.setForeground(new Color(224, 236, 255));
+            logLabel.setForeground(new Color(191, 213, 244));
+            clockHighlightPanel.setBackground(new Color(20, 52, 92));
+            clockHighlightPanel.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(new Color(91, 167, 255), 2),
+                BorderFactory.createEmptyBorder(2, 6, 2, 6)
+            ));
+            clockTitleLabel.setForeground(new Color(155, 205, 255));
+            clockCycleLabel.setForeground(new Color(91, 167, 255));
+            statsGrid.setBackground(new Color(21, 44, 78));
+            timelineLog.setBackground(new Color(8, 20, 38));
+            timelineLog.setForeground(new Color(205, 225, 255));
+            logScrollPane.getViewport().setBackground(new Color(8, 20, 38));
+        } else {
+            this.setBackground(new Color(250, 250, 250));
+            this.setBorder(BorderFactory.createLineBorder(new Color(221, 221, 221), 1));
+            titleLabel.setForeground(Color.BLACK);
+            logLabel.setForeground(Color.BLACK);
+            clockHighlightPanel.setBackground(new Color(236, 245, 255));
+            clockHighlightPanel.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(new Color(0, 102, 204), 2),
+                BorderFactory.createEmptyBorder(2, 6, 2, 6)
+            ));
+            clockTitleLabel.setForeground(new Color(0, 71, 171));
+            clockCycleLabel.setForeground(new Color(0, 102, 204));
+            statsGrid.setBackground(Color.WHITE);
+            timelineLog.setBackground(Color.WHITE);
+            timelineLog.setForeground(Color.BLACK);
+            logScrollPane.getViewport().setBackground(Color.WHITE);
+        }
+
+        repaint();
     }
 }
