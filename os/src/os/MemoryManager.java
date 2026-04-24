@@ -279,7 +279,10 @@ public class MemoryManager {
         int instructionCount = Integer.parseInt(br.readLine());
         List<String> instructions = new ArrayList<>();
         for (int i = 0; i < instructionCount; i++) {
-            instructions.add(br.readLine());
+            String instruction = br.readLine();
+            if (instruction != null && !instruction.trim().isEmpty()) {
+                instructions.add(instruction);
+            }
         }
         
         // Restore symbol table

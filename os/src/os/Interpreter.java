@@ -288,11 +288,13 @@ public class Interpreter {
         int start = parseValue(startStr, pcb, memory);
         int end = parseValue(endStr, pcb, memory);
         
-        // Print range directly (no mutex protection)
+        // Build the output exactly once and print it as a single message.
         StringBuilder output = new StringBuilder();
         for (int i = start; i <= end; i++) {
+            if (output.length() > 0) {
+                output.append(" ");
+            }
             output.append(i);
-            if (i < end) output.append(" ");
         }
         SystemCall.print(output.toString(), "P_" + pcb.processID);
     }

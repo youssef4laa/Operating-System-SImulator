@@ -29,7 +29,7 @@ public class SystemCall {
     private static SystemCallStats stats = new SystemCallStats();
     
     // Verbose logging flag
-    private static boolean verboseLogging = true;
+    private static boolean verboseLogging = false;
     
     // Input provider for GUI popups (optional)
     private static InputProvider inputProvider = null;

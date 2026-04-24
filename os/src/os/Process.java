@@ -28,7 +28,10 @@ public class Process {
             List<String> instructions = new ArrayList<>();
             String line;
             while ((line = br.readLine()) != null) {
-                instructions.add(line);
+                String trimmedLine = line.trim();
+                if (!trimmedLine.isEmpty()) {
+                    instructions.add(trimmedLine);
+                }
             }
             br.close();
             

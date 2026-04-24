@@ -166,13 +166,25 @@ public class SimulationEngine {
         
         try {
             // Check for new process arrivals (load ALL processes arriving at this time)
+            List<Integer> arrivalsThisTick = new ArrayList<>();
             while (nextArrivalIndex < fileProgramQueue.size()) {
                 FileProgram nextProgram = fileProgramQueue.get(nextArrivalIndex);
                 if (nextProgram.arrivalTime == clockCycle) {
-                    createProcess(nextArrivalIndex, nextProgram.file);
+                    arrivalsThisTick.add(nextArrivalIndex);
                     nextArrivalIndex++;
                 } else {
                     break; // No more processes arriving at this time
+                }
+            }
+
+            if ("RR".equalsIgnoreCase(scheduler.algorithm)) {
+                for (int i = arrivalsThisTick.size() - 1; i >= 0; i--) {
+                    int arrivalIdx = arrivalsThisTick.get(i);
+                    createProcess(arrivalIdx, fileProgramQueue.get(arrivalIdx).file);
+                }
+            } else {
+                for (int arrivalIdx : arrivalsThisTick) {
+                    createProcess(arrivalIdx, fileProgramQueue.get(arrivalIdx).file);
                 }
             }
             
@@ -614,6 +626,10 @@ public class SimulationEngine {
             if ("MLFQ".equalsIgnoreCase(scheduler.algorithm)) {
                 pcb.currentQueueLevel = 0;
                 scheduler.enqueueMLFQ(pcb);
+            } else if ("RR".equalsIgnoreCase(scheduler.algorithm) && pcb.arrivalTime > 0) {
+                // For RR, newly arrived processes at time > 0 must be placed ahead of the
+                // currently running process when the current quantum expires.
+                scheduler.enqueueReadyFront(pcb);
             } else {
                 scheduler.enqueueReady(pcb);
             }

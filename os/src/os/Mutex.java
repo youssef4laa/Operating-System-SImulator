@@ -21,8 +21,8 @@ public class Mutex {
 	
 	// MLFQ support
 	private Map<PCB, Integer> queueLevelMap = new HashMap<>();  // Track MLFQ queue level for each blocked process
-	private boolean enablePriorityInheritance = true;  // Enable priority inheritance for mutex owners
-	private boolean enablePriorityBoost = true;  // Boost unblocked processes to higher priority queues
+	private boolean enablePriorityInheritance = false;  // Enable priority inheritance for mutex owners
+	private boolean enablePriorityBoost = false;  // Boost unblocked processes to higher priority queues
 	private int boostLevel = 0;  // Queue level to boost unblocked processes to (0 = highest priority)
 	
 	public Mutex() {
