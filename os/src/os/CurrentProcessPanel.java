@@ -179,4 +179,48 @@ public class CurrentProcessPanel extends JPanel {
             instructionDetailsArea.setText("No process executing...");
         }
     }
+
+    /**
+     * Update display for a specific selected PCB.
+     */
+    public void update(PCB pcb) {
+        if (pcb == null) {
+            processIDLabel.setText("Process ID: None");
+            statusLabel.setText("Status: Idle");
+            queueLevelLabel.setText("Queue Level: --");
+            instructionLabel.setText("Current Instruction: --");
+            pcLabel.setText("Program Counter: --");
+            memoryBoundsLabel.setText("Memory Bounds: --");
+            arrivalTimeLabel.setText("Arrival Time: --");
+            remainingTimeLabel.setText("Remaining Time: --");
+            instructionDetailsArea.setText("No PCB selected from memory.");
+            return;
+        }
+
+        processIDLabel.setText("Process ID: P" + pcb.processID);
+        statusLabel.setText("Status: " + pcb.status);
+        queueLevelLabel.setText("Queue Level: --");
+
+        String currentInst = "None";
+        if (pcb.instructionPointer < pcb.instructionList.size()) {
+            currentInst = pcb.instructionList.get(pcb.instructionPointer);
+        }
+        instructionLabel.setText("Current Instruction: " + currentInst);
+
+        pcLabel.setText("Program Counter: " + pcb.programCounter + " / " + pcb.instructionList.size());
+        memoryBoundsLabel.setText("Memory Bounds: [" + pcb.minBound + " - " + pcb.maxBound + "]");
+        arrivalTimeLabel.setText("Arrival Time: " + pcb.arrivalTime);
+        remainingTimeLabel.setText("Remaining Time: " + pcb.remainingTime);
+
+        StringBuilder details = new StringBuilder();
+        details.append("Total Instructions: ").append(pcb.instructionList.size()).append("\n");
+        details.append("Allocation Size: ").append(pcb.allocationSize).append(" words\n");
+        details.append("Variables: ").append(pcb.variableCount).append(" / ").append(PCB.MAX_VARIABLES_PER_PROCESS).append("\n\n");
+        details.append("Symbol Table:\n");
+        pcb.symbolTable.forEach((name, address) ->
+            details.append("  ").append(name).append(" @ [").append(address).append("]\n")
+        );
+
+        instructionDetailsArea.setText(details.toString());
+    }
 }

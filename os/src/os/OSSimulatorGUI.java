@@ -33,6 +33,7 @@ public class OSSimulatorGUI extends JFrame {
     private TimelinePanel timelinePanel;
     private DebugConsole debugConsole;
     private ProgramDropZone dropZone;
+    private PCB selectedPCB;
     
     // Control elements
     private JComboBox<String> algorithmSelector;
@@ -271,6 +272,12 @@ public class OSSimulatorGUI extends JFrame {
         JLabel memoryLabel = new JLabel("Memory (40 words)");
         memoryLabel.setFont(new Font("Arial", Font.BOLD, 11));
         memoryPanel = new MemoryVisualization(engine.getMemory());
+        memoryPanel.setOnPCBClick(pcb -> {
+            selectedPCB = pcb;
+            if (currentProcessPanel != null) {
+                currentProcessPanel.update(pcb);
+            }
+        });
         
         JScrollPane memScroll = new JScrollPane(memoryPanel);
         memScroll.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_NEVER);
@@ -569,6 +576,7 @@ public class OSSimulatorGUI extends JFrame {
     private void resetSimulation(boolean showDialog) {
         pauseExecution();
         engine.reset();
+        selectedPCB = null;
         mutexPanel.setMutexManager(engine.getMutexManager());
 
         // Keep UI state aligned with engine reset behavior
@@ -593,7 +601,11 @@ public class OSSimulatorGUI extends JFrame {
             readyQueuePanel.setMLFQMode(isMLFQ, scheduler.q0, scheduler.q1, scheduler.q2, scheduler.q3);
             readyQueuePanel.update(engine.getScheduler().getReadyQueue(), engine.getScheduler().algorithm);
             blockedQueuePanel.update(engine.getScheduler().blockedQueue, engine.getScheduler().algorithm);
-            currentProcessPanel.update(engine.getScheduler());
+            if (selectedPCB != null) {
+                currentProcessPanel.update(selectedPCB);
+            } else {
+                currentProcessPanel.update(engine.getScheduler());
+            }
             mutexPanel.update();
             statsPanel.update();
             timelinePanel.update(

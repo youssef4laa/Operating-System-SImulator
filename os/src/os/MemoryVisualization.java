@@ -2,6 +2,10 @@ package os;
 
 import javax.swing.*;
 import java.awt.*;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
+import java.awt.event.MouseMotionAdapter;
+import java.util.function.Consumer;
 
 /**
  * MemoryVisualization - Displays 40-word memory as a visual grid
@@ -10,6 +14,7 @@ import java.awt.*;
 public class MemoryVisualization extends JPanel {
     
     private Memory memory;
+    private Consumer<PCB> onPCBClick;
     private static final int GRID_COLS = 8;
     private static final int GRID_ROWS = 5;
     private static final int CELL_WIDTH = 56;
@@ -40,6 +45,34 @@ public class MemoryVisualization extends JPanel {
         this.setPreferredSize(new Dimension(totalWidth, totalHeight));
         
         initializeCells();
+        addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                MemoryCell cell = getCellAt(e.getX(), e.getY());
+                if (cell == null) {
+                    return;
+                }
+                try {
+                    Object value = memory.read(cell.address);
+                    if (value instanceof PCB && onPCBClick != null) {
+                        onPCBClick.accept((PCB) value);
+                    }
+                } catch (Exception ignored) {
+                }
+            }
+        });
+        addMouseMotionListener(new MouseMotionAdapter() {
+            @Override
+            public void mouseMoved(MouseEvent e) {
+                MemoryCell cell = getCellAt(e.getX(), e.getY());
+                try {
+                    Object value = cell == null ? null : memory.read(cell.address);
+                    setCursor(value instanceof PCB ? Cursor.getPredefinedCursor(Cursor.HAND_CURSOR) : Cursor.getDefaultCursor());
+                } catch (Exception ignored) {
+                    setCursor(Cursor.getDefaultCursor());
+                }
+            }
+        });
     }
     
     private void initializeCells() {
@@ -108,6 +141,19 @@ public class MemoryVisualization extends JPanel {
     /**
      * Update memory visualization
      */
+    public void setOnPCBClick(Consumer<PCB> onPCBClick) {
+        this.onPCBClick = onPCBClick;
+    }
+
+    private MemoryCell getCellAt(int mouseX, int mouseY) {
+        for (MemoryCell cell : cells) {
+            if (mouseX >= cell.x && mouseX <= cell.x + cell.width && mouseY >= cell.y && mouseY <= cell.y + cell.height) {
+                return cell;
+            }
+        }
+        return null;
+    }
+
     public void update(Memory memory) {
         try {
             for (int i = 0; i < 40; i++) {
