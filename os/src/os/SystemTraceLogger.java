@@ -65,6 +65,7 @@ public class SystemTraceLogger implements SchedulerObserver {
             System.out.println("    ID: P" + event.affectedProcess.processID);
             System.out.println("    Status: " + event.affectedProcess.status);
             System.out.println("    PC: " + event.affectedProcess.programCounter);
+            System.out.println("    Queue: Q" + event.affectedProcess.currentQueueLevel);
             System.out.println("    Instructions: " + event.affectedProcess.instructionList.size());
         }
         

@@ -44,7 +44,9 @@ public class QueueVisualization extends JPanel {
         processBox.setBackground(Color.WHITE);
         
         JScrollPane scrollPane = new JScrollPane(processBox);
-        scrollPane.setPreferredSize(new Dimension(0, 210));
+        scrollPane.setPreferredSize(new Dimension(0, 320));
+        scrollPane.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_AS_NEEDED);
+        scrollPane.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
         this.add(scrollPane, BorderLayout.CENTER);
     }
 
@@ -65,7 +67,7 @@ public class QueueVisualization extends JPanel {
     public void update(LinkedList<PCB> queue, String algorithm) {
         processBox.removeAll();
 
-        if (mlfqReadyMode && "MLFQ".equalsIgnoreCase(algorithm)) {
+        if ("MLFQ".equalsIgnoreCase(algorithm) && "Ready".equalsIgnoreCase(queueName)) {
             renderMLFQLanes();
             processBox.revalidate();
             processBox.repaint();
@@ -96,11 +98,11 @@ public class QueueVisualization extends JPanel {
         processBox.setLayout(new BoxLayout(processBox, BoxLayout.Y_AXIS));
         processBox.add(createQueueLane("Q0 - Highest", q0, new Color(225, 240, 255), new Color(0, 102, 204)));
         processBox.add(Box.createVerticalStrut(6));
-        processBox.add(createQueueLane("Q1", q1, new Color(255, 248, 220), new Color(255, 153, 0)));
+        processBox.add(createQueueLane("Q1 - High", q1, new Color(255, 248, 220), new Color(255, 153, 0)));
         processBox.add(Box.createVerticalStrut(6));
-        processBox.add(createQueueLane("Q2", q2, new Color(255, 239, 229), new Color(230, 95, 32)));
+        processBox.add(createQueueLane("Q2 - Medium", q2, new Color(255, 239, 229), new Color(230, 95, 32)));
         processBox.add(Box.createVerticalStrut(6));
-        processBox.add(createQueueLane("Q3", q3, new Color(240, 240, 240), new Color(120, 120, 120)));
+        processBox.add(createQueueLane("Q3 - Lowest", q3, new Color(240, 240, 240), new Color(120, 120, 120)));
 
         int total = q0.size() + q1.size() + q2.size() + q3.size();
         queueStatusLabel.setText(queueName + " Queue (" + total + " processes across Q0-Q3)");
@@ -115,8 +117,11 @@ public class QueueVisualization extends JPanel {
         ));
 
         JLabel laneHeader = new JLabel(laneName + " (" + queueData.size() + ")");
-        laneHeader.setFont(new Font("Arial", Font.BOLD, 11));
+        laneHeader.setFont(new Font("Arial", Font.BOLD, laneName.startsWith("Q0") ? 12 : 11));
         laneHeader.setForeground(darken(laneBorder));
+        if (laneName.startsWith("Q0")) {
+            laneHeader.setForeground(new Color(0, 51, 153));
+        }
         lanePanel.add(laneHeader, BorderLayout.NORTH);
 
         JPanel laneCards = new JPanel(new FlowLayout(FlowLayout.LEFT, 5, 5));
@@ -128,7 +133,7 @@ public class QueueVisualization extends JPanel {
             laneCards.add(emptyLabel);
         } else {
             for (PCB pcb : queueData) {
-                laneCards.add(createProcessCard(pcb, "MLFQ", false));
+                laneCards.add(createProcessCard(pcb, "MLFQ", true));
             }
         }
 

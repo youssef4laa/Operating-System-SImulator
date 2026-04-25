@@ -100,7 +100,7 @@ public class Scheduler {
      * Observer Pattern: Notify all observers of a scheduling event
      */
     private void notifySchedulingEvent(SchedulingEvent event) {
-        event.readyQueueSize = readyQueue.size();
+        event.readyQueueSize = getReadyQueue().size();
         event.blockedQueueSize = blockedQueue.size();
         event.finishedQueueSize = finishedQueue.size();
         
@@ -657,7 +657,15 @@ public class Scheduler {
      */
     private void printSchedulerState() {
         System.out.println("\n[Time: " + time + "]");
-        System.out.println("Ready Queue: " + queueToString(readyQueue));
+        if ("MLFQ".equalsIgnoreCase(algorithm)) {
+            System.out.println("MLFQ Ready Queues:");
+            System.out.println("  Q0: " + queueToString(q0));
+            System.out.println("  Q1: " + queueToString(q1));
+            System.out.println("  Q2: " + queueToString(q2));
+            System.out.println("  Q3: " + queueToString(q3));
+        } else {
+            System.out.println("Ready Queue: " + queueToString(readyQueue));
+        }
         System.out.println("Blocked Queue: " + queueToString(blockedQueue));
         System.out.println("Finished Queue: " + queueToString(finishedQueue));
     }

@@ -253,18 +253,35 @@ public class SimulationEngine {
             return;
         }
 
+        int queueLevel = nextPCB.currentQueueLevel;
+        debugConsole.log("[Clock " + clockCycle + "] Selected P" + nextPCB.processID + " from Q" + queueLevel + " for MLFQ execution");
+        if (nextPCB.instructionPointer < nextPCB.instructionList.size()) {
+            debugConsole.log("  Instruction: " + nextPCB.instructionList.get(nextPCB.instructionPointer));
+        }
+
         SchedulingEvent selectedEvent = new SchedulingEvent(
             SchedulingEvent.EventType.PROCESS_SELECTED,
             clockCycle,
             nextPCB
         );
-        selectedEvent.eventDetails = "Selected via MLFQ";
+        selectedEvent.eventDetails = "Selected via MLFQ from Q" + queueLevel;
         scheduler.emitSchedulingEvent(selectedEvent);
 
         int beforePointer = nextPCB.instructionPointer;
         scheduler.runMLFQ(nextPCB, memory);
+
         int executedThisSlice = Math.max(0, nextPCB.instructionPointer - beforePointer);
         instructionsExecuted += executedThisSlice;
+        if (executedThisSlice > 0) {
+            debugConsole.log("  -> Executed " + executedThisSlice + " instruction(s) for P" + nextPCB.processID + ".");
+        }
+        if ("Ready".equals(nextPCB.status)) {
+            debugConsole.log("  -> P" + nextPCB.processID + " returned to Q" + nextPCB.currentQueueLevel + " after MLFQ quantum.");
+        } else if ("Blocked".equals(nextPCB.status)) {
+            debugConsole.log("  -> P" + nextPCB.processID + " blocked on resource and moved to blocked queue.");
+        } else if ("Finished".equals(nextPCB.status)) {
+            debugConsole.log("  -> P" + nextPCB.processID + " completed execution.");
+        }
     }
 
     /**

@@ -26,6 +26,7 @@ public class CurrentProcessPanel extends JPanel {
     private JLabel memoryBoundsLabel;
     private JLabel arrivalTimeLabel;
     private JLabel remainingTimeLabel;
+    private JLabel queueLevelLabel;
     private JTextArea instructionDetailsArea;
     
     public CurrentProcessPanel() {
@@ -49,6 +50,9 @@ public class CurrentProcessPanel extends JPanel {
         // Status
         statusLabel = new JLabel("Status: Idle");
         statusLabel.setFont(new Font("Arial", Font.PLAIN, 12));
+        
+        queueLevelLabel = new JLabel("Queue Level: --");
+        queueLevelLabel.setFont(new Font("Arial", Font.PLAIN, 11));
         
         // Current Instruction
         instructionLabel = new JLabel("Current Instruction: --");
@@ -87,6 +91,8 @@ public class CurrentProcessPanel extends JPanel {
         innerPanel.add(processIDLabel);
         innerPanel.add(Box.createVerticalStrut(3));
         innerPanel.add(statusLabel);
+        innerPanel.add(Box.createVerticalStrut(3));
+        innerPanel.add(queueLevelLabel);
         innerPanel.add(Box.createVerticalStrut(5));
         innerPanel.add(new JSeparator());
         innerPanel.add(Box.createVerticalStrut(3));
@@ -111,9 +117,10 @@ public class CurrentProcessPanel extends JPanel {
      * Update current process display
      */
     public void update(Scheduler scheduler) {
-        if (scheduler == null || scheduler.readyQueue.isEmpty()) {
+        if (scheduler == null) {
             processIDLabel.setText("Process ID: None");
             statusLabel.setText("Status: Idle");
+            queueLevelLabel.setText("Queue Level: --");
             instructionLabel.setText("Current Instruction: --");
             pcLabel.setText("Program Counter: --");
             memoryBoundsLabel.setText("Memory Bounds: --");
@@ -123,37 +130,53 @@ public class CurrentProcessPanel extends JPanel {
             return;
         }
         
-        // Try to get current process from ready queue (first one would be executing)
-        if (!scheduler.readyQueue.isEmpty()) {
-            PCB pcb = scheduler.readyQueue.peek();
-            if (pcb != null) {
-                processIDLabel.setText("Process ID: P" + pcb.processID);
-                statusLabel.setText("Status: " + pcb.status);
-                
-                // Current instruction
-                String currentInst = "None";
-                if (pcb.instructionPointer < pcb.instructionList.size()) {
-                    currentInst = pcb.instructionList.get(pcb.instructionPointer);
-                }
-                instructionLabel.setText("Current Instruction: " + currentInst);
-                
-                pcLabel.setText("Program Counter: " + pcb.programCounter + " / " + pcb.instructionList.size());
-                memoryBoundsLabel.setText("Memory Bounds: [" + pcb.minBound + " - " + pcb.maxBound + "]");
-                arrivalTimeLabel.setText("Arrival Time: " + pcb.arrivalTime);
-                remainingTimeLabel.setText("Remaining Time: " + pcb.remainingTime);
-                
-                // Instruction details
-                StringBuilder details = new StringBuilder();
-                details.append("Total Instructions: ").append(pcb.instructionList.size()).append("\n");
-                details.append("Allocation Size: ").append(pcb.allocationSize).append(" words\n");
-                details.append("Variables: ").append(pcb.variableCount).append(" / ").append(PCB.MAX_VARIABLES_PER_PROCESS).append("\n\n");
-                details.append("Symbol Table:\n");
-                pcb.symbolTable.forEach((name, address) ->
-                    details.append("  ").append(name).append(" @ [").append(address).append("]\n")
-                );
-                
-                instructionDetailsArea.setText(details.toString());
+        PCB pcb = scheduler.selectNextProcess();
+        if (pcb == null && !scheduler.getReadyQueue().isEmpty()) {
+            pcb = scheduler.getReadyQueue().peek();
+        }
+
+        if (pcb != null) {
+            processIDLabel.setText("Process ID: P" + pcb.processID);
+            statusLabel.setText("Status: " + pcb.status);
+            if ("MLFQ".equalsIgnoreCase(scheduler.algorithm)) {
+                queueLevelLabel.setText("Queue Level: Q" + pcb.currentQueueLevel);
+            } else {
+                queueLevelLabel.setText("Queue Level: --");
             }
+
+            // Current instruction
+            String currentInst = "None";
+            if (pcb.instructionPointer < pcb.instructionList.size()) {
+                currentInst = pcb.instructionList.get(pcb.instructionPointer);
+            }
+            instructionLabel.setText("Current Instruction: " + currentInst);
+
+            pcLabel.setText("Program Counter: " + pcb.programCounter + " / " + pcb.instructionList.size());
+            memoryBoundsLabel.setText("Memory Bounds: [" + pcb.minBound + " - " + pcb.maxBound + "]");
+            arrivalTimeLabel.setText("Arrival Time: " + pcb.arrivalTime);
+            remainingTimeLabel.setText("Remaining Time: " + pcb.remainingTime);
+
+            // Instruction details
+            StringBuilder details = new StringBuilder();
+            details.append("Total Instructions: ").append(pcb.instructionList.size()).append("\n");
+            details.append("Allocation Size: ").append(pcb.allocationSize).append(" words\n");
+            details.append("Variables: ").append(pcb.variableCount).append(" / ").append(PCB.MAX_VARIABLES_PER_PROCESS).append("\n\n");
+            details.append("Symbol Table:\n");
+            pcb.symbolTable.forEach((name, address) ->
+                details.append("  ").append(name).append(" @ [").append(address).append("]\n")
+            );
+
+            instructionDetailsArea.setText(details.toString());
+        } else {
+            processIDLabel.setText("Process ID: None");
+            statusLabel.setText("Status: Idle");
+            queueLevelLabel.setText("Queue Level: --");
+            instructionLabel.setText("Current Instruction: --");
+            pcLabel.setText("Program Counter: --");
+            memoryBoundsLabel.setText("Memory Bounds: --");
+            arrivalTimeLabel.setText("Arrival Time: --");
+            remainingTimeLabel.setText("Remaining Time: --");
+            instructionDetailsArea.setText("No process executing...");
         }
     }
 }
