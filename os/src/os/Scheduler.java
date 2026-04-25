@@ -181,12 +181,16 @@ public class Scheduler {
             // Check for new process arrivals at the START of this time unit
             checkArrivals(time, memory);
             
+            // Attempt to restore swapped-out processes if memory is available
+            attemptSwapIn(memory);
+
             // Check termination: all queues empty
             boolean readyEmpty = readyQueue.isEmpty();
             boolean blockedEmpty = blockedQueue.isEmpty();
+            boolean swappedEmpty = swappedQueue.isEmpty();
             boolean allMLFQEmpty = q0.isEmpty() && q1.isEmpty() && q2.isEmpty() && q3.isEmpty();
             
-            if (readyEmpty && blockedEmpty && allMLFQEmpty) {
+            if (readyEmpty && blockedEmpty && swappedEmpty && allMLFQEmpty) {
                 // No more processes to run
                 System.out.println("\n========================================");
                 System.out.println("All processes completed");
@@ -608,7 +612,9 @@ public class Scheduler {
                 PCB toSwap = findProcessToSwap();
                 if (toSwap != null) {
                     System.out.println("[SWAP] Swapping out " + toSwap.processID);
+                    removeFromAllQueues(toSwap);
                     MemoryManager.swapOut(toSwap, memory);
+                    enqueueSwapped(toSwap);
                     
                     // Try creating the process again
                     try {
@@ -650,6 +656,41 @@ public class Scheduler {
         // If no ready process, don't swap blocked processes (they're waiting for resources)
         // In a real OS, we might swap other processes here
         return null;
+    }
+
+    private void enqueueSwapped(PCB pcb) {
+        removeFromAllQueues(pcb);
+        pcb.status = "Swapped";
+        swappedQueue.addLast(pcb);
+    }
+
+    private void attemptSwapIn(Memory memory) throws Exception {
+        Iterator<PCB> iter = swappedQueue.iterator();
+        while (iter.hasNext()) {
+            PCB pcb = iter.next();
+            int requiredSize = pcb.allocationSize;
+            if (MemoryManager.getFreeMemory(memory) < requiredSize) {
+                continue;
+            }
+
+            if (!MemoryManager.checkAndTriggerSwap(memory, requiredSize)) {
+                continue;
+            }
+
+            int start = MemoryManager.findAvailableBlock(memory, requiredSize);
+            if (start == -1) {
+                continue;
+            }
+
+            MemoryManager.swapIn(pcb, memory, start);
+            iter.remove();
+            if ("MLFQ".equalsIgnoreCase(algorithm)) {
+                enqueueMLFQ(pcb);
+            } else {
+                enqueueReady(pcb);
+            }
+            System.out.println("[SWAP] Process P" + pcb.processID + " restored from disk and re-queued");
+        }
     }
     
     /**

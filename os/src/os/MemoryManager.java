@@ -1,7 +1,9 @@
 package os;
 
 import java.io.*;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
+import java.util.Base64;
 
 /**
  * MemoryManager handles memory allocation, deallocation, and swapping
@@ -102,20 +104,45 @@ public class MemoryManager {
         int start = -1;
 
         for (int i = 0; i < memory.getSize(); i++) {
-            try {
-                if (!occupied[i]) {
-                    if (start == -1) start = i;
-                    count++;
-                    if (count >= requiredSize) return start;
-                } else {
-                    start = -1;
-                    count = 0;
-                }
-            } catch (Exception e) { 
-                return -1; 
+            if (!occupied[i]) {
+                if (start == -1) start = i;
+                count++;
+                if (count >= requiredSize) return start;
+            } else {
+                start = -1;
+                count = 0;
             }
         }
-        return -1; 
+        return -1;
+    }
+
+    /**
+     * Ensures a contiguous block of required size is available, swapping out processes as needed.
+     * @return starting address of available block or -1 when unable to obtain contiguous allocation.
+     */
+    public static int ensureContiguousBlock(Memory memory, int requiredSize) throws Exception {
+        int start = findAvailableBlock(memory, requiredSize);
+        if (start != -1) {
+            return start;
+        }
+
+        // Keep swapping until a contiguous block is available or no process can be swapped.
+        while (true) {
+            int freeMemory = getFreeMemory(memory);
+            if (freeMemory >= requiredSize) {
+                if (!swapOutProcessByLongestTime(memory)) {
+                    return -1;
+                }
+                start = findAvailableBlock(memory, requiredSize);
+                if (start != -1) {
+                    return start;
+                }
+            } else {
+                if (!swapOutProcessByLongestTime(memory)) {
+                    return -1;
+                }
+            }
+        }
     }
     
     /**
@@ -211,6 +238,60 @@ public class MemoryManager {
      * Swaps a process out to disk
      * Saves PCB state, instruction list, and memory contents
      */
+    private static String serializeMemoryObject(Object data) {
+        if (data == null) {
+            return "NULL";
+        }
+        if (data instanceof PCB) {
+            return "PCB";
+        }
+        if (data instanceof String) {
+            String encoded = Base64.getEncoder().encodeToString(((String) data).getBytes(StandardCharsets.UTF_8));
+            return "STRING:" + encoded;
+        }
+        if (data instanceof Integer) {
+            return "INTEGER:" + data;
+        }
+        if (data instanceof Long) {
+            return "LONG:" + data;
+        }
+        if (data instanceof Double) {
+            return "DOUBLE:" + data;
+        }
+        if (data instanceof Boolean) {
+            return "BOOLEAN:" + data;
+        }
+        // Fallback: preserve string form with encoding
+        String fallback = Base64.getEncoder().encodeToString(data.toString().getBytes(StandardCharsets.UTF_8));
+        return "STRING:" + fallback;
+    }
+
+    private static Object deserializeMemoryObject(String serialized) throws Exception {
+        if (serialized == null || serialized.equals("NULL")) {
+            return null;
+        }
+        if (serialized.equals("PCB")) {
+            return "PCB"; // handled by swapIn caller
+        }
+        if (serialized.startsWith("STRING:")) {
+            String payload = serialized.substring("STRING:".length());
+            return new String(Base64.getDecoder().decode(payload), StandardCharsets.UTF_8);
+        }
+        if (serialized.startsWith("INTEGER:")) {
+            return Integer.parseInt(serialized.substring("INTEGER:".length()));
+        }
+        if (serialized.startsWith("LONG:")) {
+            return Long.parseLong(serialized.substring("LONG:".length()));
+        }
+        if (serialized.startsWith("DOUBLE:")) {
+            return Double.parseDouble(serialized.substring("DOUBLE:".length()));
+        }
+        if (serialized.startsWith("BOOLEAN:")) {
+            return Boolean.parseBoolean(serialized.substring("BOOLEAN:".length()));
+        }
+        throw new Exception("Unsupported serialized memory object: " + serialized);
+    }
+
     public static void swapOut(PCB pcb, Memory memory) throws Exception {
         System.out.println("Swapping OUT Process ID: " + pcb.processID);
         
@@ -229,25 +310,26 @@ public class MemoryManager {
         // Save instruction list
         pw.println(pcb.instructionList.size());
         for (String instruction : pcb.instructionList) {
-            pw.println(instruction);
+            pw.println(serializeMemoryObject(instruction));
         }
         
         // Save symbol table (variable mappings)
         pw.println(pcb.symbolTable.size());
         for (Map.Entry<String, Integer> entry : pcb.symbolTable.entrySet()) {
-            pw.println(entry.getKey() + ":" + entry.getValue());
+            pw.println(serializeMemoryObject(entry.getKey()) + ":" + entry.getValue());
         }
         
-        // Save memory contents
+        // Save memory contents and clear memory
         for (int i = pcb.minBound; i <= pcb.maxBound; i++) {
             Object data = memory.read(i);
-            pw.println(data == null ? "null" : data.toString());
-            memory.write(i, null); // Clear memory after saving
+            pw.println(serializeMemoryObject(data));
+            memory.write(i, null);
         }
         pw.close();
         
         // Untrack allocation since it's no longer in memory
         untrackAllocation(pcb.processID);
+        pcb.status = "Swapped";
         System.out.println("Process " + pcb.processID + " swapped to disk: " + filename);
     }
 
@@ -268,20 +350,32 @@ public class MemoryManager {
         
         // Restore PCB state
         int processID = Integer.parseInt(br.readLine());
-        String status = br.readLine();
+        String savedStatus = br.readLine();
         int programCounter = Integer.parseInt(br.readLine());
         int instructionPointer = Integer.parseInt(br.readLine());
         int totalInstructions = Integer.parseInt(br.readLine());
         int variableCount = Integer.parseInt(br.readLine());
         int allocationSize = Integer.parseInt(br.readLine());
         
+        if (processID != pcb.processID) {
+            br.close();
+            throw new Exception("Swap file process ID mismatch: expected " + pcb.processID + " but found " + processID);
+        }
+        
         // Restore instruction list
         int instructionCount = Integer.parseInt(br.readLine());
         List<String> instructions = new ArrayList<>();
         for (int i = 0; i < instructionCount; i++) {
-            String instruction = br.readLine();
-            if (instruction != null && !instruction.trim().isEmpty()) {
-                instructions.add(instruction);
+            String instructionLine = br.readLine();
+            if (instructionLine == null) {
+                br.close();
+                throw new Exception("Unexpected end of swap file while restoring instructions for process " + pcb.processID);
+            }
+            Object value = deserializeMemoryObject(instructionLine);
+            if (value instanceof String) {
+                instructions.add((String) value);
+            } else {
+                throw new Exception("Invalid instruction serialization for process " + pcb.processID);
             }
         }
         
@@ -290,25 +384,44 @@ public class MemoryManager {
         Map<String, Integer> symbolTable = new HashMap<>();
         for (int i = 0; i < symbolTableSize; i++) {
             String line = br.readLine();
-            String[] parts = line.split(":");
-            String varName = parts[0];
-            int oldAddress = Integer.parseInt(parts[1]);
-            // Recalculate address based on new memory location
+            if (line == null) {
+                br.close();
+                throw new Exception("Unexpected end of swap file while restoring symbol table for process " + pcb.processID);
+            }
+            int separatorIndex = line.lastIndexOf(":");
+            if (separatorIndex == -1) {
+                br.close();
+                throw new Exception("Invalid symbol table entry in swap file: " + line);
+            }
+            String varName = line.substring(0, separatorIndex);
+            int oldAddress = Integer.parseInt(line.substring(separatorIndex + 1));
             int newAddress = newStart + (oldAddress - pcb.minBound);
             symbolTable.put(varName, newAddress);
         }
         
         // Restore memory contents
         int current = newStart;
-        String line;
-        while ((line = br.readLine()) != null && current < memory.getSize()) {
-            Object data = line.equals("null") ? null : line;
+        for (int i = 0; i < allocationSize; i++) {
+            String line = br.readLine();
+            if (line == null) {
+                br.close();
+                throw new Exception("Unexpected end of swap file while restoring memory contents for process " + pcb.processID);
+            }
+            if (i == 0) {
+                if (!"PCB".equals(line)) {
+                    br.close();
+                    throw new Exception("Swap file corrupted: expected PCB marker at start of memory contents for process " + pcb.processID);
+                }
+                memory.write(current++, pcb);
+                continue;
+            }
+            Object data = deserializeMemoryObject(line);
             memory.write(current++, data);
         }
         br.close();
         
         // Update PCB with new state
-        pcb.status = status;
+        pcb.status = "Ready";
         pcb.programCounter = programCounter;
         pcb.instructionPointer = instructionPointer;
         pcb.totalInstructions = totalInstructions;
@@ -317,15 +430,15 @@ public class MemoryManager {
         pcb.instructionList = instructions;
         pcb.symbolTable = symbolTable;
         pcb.minBound = newStart;
-        pcb.maxBound = current - 1;
+        pcb.maxBound = newStart + allocationSize - 1;
         
         // Track new allocation
-        trackAllocation(pcb.processID, newStart, current - 1);
+        trackAllocation(pcb.processID, newStart, pcb.maxBound);
         
         // Delete swap file
         file.delete();
         System.out.println("Process " + pcb.processID + " swapped in at addresses " + 
-                         newStart + "-" + (current - 1));
+                         newStart + "-" + pcb.maxBound);
     }
     
     /**

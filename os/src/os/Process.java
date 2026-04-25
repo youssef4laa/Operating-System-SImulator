@@ -45,13 +45,13 @@ public class Process {
                 throw new Exception("Invalid allocation size: " + requiredSize + " words exceeds memory capacity");
             }
             
-            // Check memory pressure and trigger swap if needed
+            // Check memory pressure and trigger swap if needed.
             if (!MemoryManager.checkAndTriggerSwap(memory, requiredSize)) {
                 throw new Exception("Memory swap failed: Cannot free space for process (" + 
                                    requiredSize + " words required)");
             }
             
-            int start = MemoryManager.findAvailableBlock(memory, requiredSize);
+            int start = MemoryManager.ensureContiguousBlock(memory, requiredSize);
             
             // If no space available even after swap, fail
             if (start == -1) {
