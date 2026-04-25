@@ -245,10 +245,13 @@ public class SimulationEngine {
     }
 
     /**
-     * GUI step mode for MLFQ: execute one selected process for its MLFQ quantum.
+     * GUI step mode for MLFQ: execute a single instruction for the selected process
+     * and update its MLFQ quantum and queue level.
      */
     private void executeMLFQQuantumStep() throws Exception {
-        PCB nextPCB = scheduler.MLFQ();
+        // Select the next MLFQ process without removing it from its queue.
+        // This preserves visibility of Q0 on a single-step update.
+        PCB nextPCB = scheduler.selectNextProcess();
         if (nextPCB == null) {
             return;
         }
@@ -267,20 +270,78 @@ public class SimulationEngine {
         selectedEvent.eventDetails = "Selected via MLFQ from Q" + queueLevel;
         scheduler.emitSchedulingEvent(selectedEvent);
 
-        int beforePointer = nextPCB.instructionPointer;
-        scheduler.runMLFQ(nextPCB, memory);
+        nextPCB.status = "Running";
+        int level = (nextPCB.inheritedPriority != -1) ? nextPCB.inheritedPriority : nextPCB.currentQueueLevel;
+        int quantum = (int) Math.pow(2, level);
+        nextPCB.quantumUsed++;
 
-        int executedThisSlice = Math.max(0, nextPCB.instructionPointer - beforePointer);
-        instructionsExecuted += executedThisSlice;
-        if (executedThisSlice > 0) {
-            debugConsole.log("  -> Executed " + executedThisSlice + " instruction(s) for P" + nextPCB.processID + ".");
+        if (nextPCB.instructionPointer < nextPCB.instructionList.size()) {
+            String instructionString = nextPCB.instructionList.get(nextPCB.instructionPointer);
+            currentInstruction = instructionString;
+            debugConsole.log("[Clock " + clockCycle + "] Process P" + nextPCB.processID +
+                           " executing, PC: " + nextPCB.programCounter);
+            debugConsole.log("  Instruction: " + instructionString);
+
+            Interpreter.execute(nextPCB, memory);
+            instructionsExecuted++;
         }
+
+        if ("Terminated".equals(nextPCB.status)) {
+            debugConsole.log("  -> Process P" + nextPCB.processID + " TERMINATED (fatal error)");
+            scheduler.readyQueue.remove(nextPCB);
+            scheduler.blockedQueue.remove(nextPCB);
+            try {
+                Process.terminateProcess(nextPCB, memory, scheduler);
+            } catch (Exception e) {
+                debugConsole.log("Cleanup failed for terminated process: " + e.getMessage(), true);
+            }
+            if (!scheduler.finishedQueue.contains(nextPCB)) {
+                scheduler.finishedQueue.add(nextPCB);
+            }
+
+            SchedulingEvent finishedEvent = new SchedulingEvent(
+                SchedulingEvent.EventType.PROCESS_FINISHED,
+                clockCycle,
+                nextPCB
+            );
+            finishedEvent.eventDetails = "Process terminated due to fatal error";
+            scheduler.emitSchedulingEvent(finishedEvent);
+            return;
+        }
+
+        if (nextPCB.status.equals("Blocked") || nextPCB.status.equals("Finished") ||
+            nextPCB.programCounter > nextPCB.maxBound || nextPCB.instructionPointer >= nextPCB.instructionList.size()) {
+            if (nextPCB.instructionPointer >= nextPCB.instructionList.size() && !"Finished".equals(nextPCB.status)) {
+                nextPCB.status = "Finished";
+            }
+            scheduler.moveToMLFQ(nextPCB);
+            if ("Blocked".equals(nextPCB.status)) {
+                debugConsole.log("  -> P" + nextPCB.processID + " blocked on resource and moved to blocked queue.");
+            } else if ("Finished".equals(nextPCB.status)) {
+                debugConsole.log("  -> P" + nextPCB.processID + " completed execution.");
+            }
+            return;
+        }
+
+        if (nextPCB.quantumUsed >= quantum) {
+            if (nextPCB.inheritedPriority == -1 && nextPCB.currentQueueLevel < 3) {
+                int oldLevel = nextPCB.currentQueueLevel;
+                nextPCB.currentQueueLevel++;
+                nextPCB.quantumUsed = 0;
+                debugConsole.log("  [MLFQ] Queue demotion: P" + nextPCB.processID +
+                    " Q" + oldLevel + " → Q" + nextPCB.currentQueueLevel + " (used full quantum)");
+            }
+            if (nextPCB.inheritedPriority != -1) {
+                debugConsole.log("  [MLFQ MUTEX] Temporary boost expired: P" + nextPCB.processID +
+                    " returns to Q" + nextPCB.currentQueueLevel);
+                nextPCB.inheritedPriority = -1;
+                nextPCB.quantumUsed = 0;
+            }
+        }
+
+        scheduler.moveToMLFQ(nextPCB);
         if ("Ready".equals(nextPCB.status)) {
             debugConsole.log("  -> P" + nextPCB.processID + " returned to Q" + nextPCB.currentQueueLevel + " after MLFQ quantum.");
-        } else if ("Blocked".equals(nextPCB.status)) {
-            debugConsole.log("  -> P" + nextPCB.processID + " blocked on resource and moved to blocked queue.");
-        } else if ("Finished".equals(nextPCB.status)) {
-            debugConsole.log("  -> P" + nextPCB.processID + " completed execution.");
         }
     }
 
