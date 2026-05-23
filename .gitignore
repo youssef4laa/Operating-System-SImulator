@@ -1,0 +1,81 @@
+# Compiled class files
+*.class
+bin/
+out/
+
+# Package files
+*.jar
+*.war
+*.nar
+*.ear
+*.zip
+*.tar.gz
+*.rar
+
+# IDE specific files
+.vscode/
+.idea/
+*.swp
+*.swo
+*.sublime-project
+*.sublime-workspace
+.classpath
+.project
+.settings/
+*.iml
+*.iws
+*.ipr
+
+# OS specific files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Build and dependency files
+target/
+.gradle/
+gradle/
+build/
+dist/
+
+# Temporary and log files
+*.log
+*.tmp
+*.bak
+*~
+.cache/
+
+# Test files
+test-output/
+*.dat
+
+# Environment specific files
+.env
+.env.local
+
+# JavaFX runtime binaries (excluded as they're environment-specific)
+*.so
+*.dll
+*.dylib
+
+# Misc development files
+.recommenders/
+.project
+.workspace
+tmp/
+temp/
+*.orig
+
+# Media files (if any test outputs generate them)
+*.mp4
+*.avi
+*.mov
+
+# Virtual environments (if using any)
+venv/
+ENV/
+env/
